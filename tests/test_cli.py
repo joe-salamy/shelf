@@ -94,7 +94,7 @@ def test_shelf_default_output_dir(tmp_path):
     fake_tree = _make_fake_tree()
     captured_args = {}
 
-    def capture_write(tree, output_dir):
+    def capture_write(tree, output_dir, smart_index=None):
         captured_args["output_dir"] = output_dir
 
     runner = CliRunner()
@@ -112,13 +112,14 @@ def test_shelf_summarize_flag(tmp_path):
     pdf.write_bytes(b"%PDF-1.4 fake")
 
     fake_tree = _make_fake_tree()
+    from shelf.summarize import SmartIndex
+    fake_smart_index = SmartIndex(descriptions={}, overview="Test overview.")
 
     runner = CliRunner()
     with patch("shelf.cli.convert", return_value=FAKE_MARKDOWN), \
          patch("shelf.cli.split_markdown", return_value=fake_tree), \
          patch("shelf.cli.write_shelf"), \
-         patch("shelf.summarize.summarize_tree") as mock_summarize:
+         patch("shelf.summarize.generate_smart_index", return_value=fake_smart_index):
         result = runner.invoke(main, [str(pdf), "--output", str(tmp_path / "out"), "--summarize"])
 
-    # summarize is imported inside cli, so patch at the import location
     assert result.exit_code == 0

@@ -19,9 +19,10 @@ def shelf(input_path, output_dir=None, depth=3, summarize=False):
     markdown = convert(input_path)
     tree = split_markdown(markdown, depth=depth, source_path=input_path)
 
+    smart_index = None
     if summarize:
-        from shelf.summarize import summarize_tree
-        summarize_tree(tree)
+        from shelf.summarize import generate_smart_index
+        smart_index = generate_smart_index(tree)
 
-    write_shelf(tree, output_dir)
+    write_shelf(tree, output_dir, smart_index=smart_index)
     return output_dir

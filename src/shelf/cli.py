@@ -25,7 +25,7 @@ from shelf.output import write_shelf
     "--summarize", "-s",
     is_flag=True,
     default=False,
-    help="Add LLM-generated summaries to each section (requires Ollama or API key)",
+    help="Generate a smart INDEX.md with one-line descriptions via a single LLM call (requires Ollama or API key)",
 )
 def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
     """Convert a PDF or EPUB textbook into a nested markdown directory.
@@ -44,15 +44,16 @@ def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
     click.echo("Splitting into sections...")
     tree = split_markdown(markdown, depth=depth, source_path=input_path)
 
+    smart_index = None
     if summarize:
-        click.echo("Generating summaries...")
+        click.echo("Generating smart index...")
         try:
-            from shelf.summarize import summarize_tree
-            summarize_tree(tree)
+            from shelf.summarize import generate_smart_index
+            smart_index = generate_smart_index(tree)
         except Exception as e:
-            raise click.ClickException(f"Summarization failed: {e}")
+            raise click.ClickException(f"Smart index generation failed: {e}")
 
-    write_shelf(tree, output_dir)
+    write_shelf(tree, output_dir, smart_index=smart_index)
 
     chapter_count = tree.chapter_count()
     section_count = tree.section_count()

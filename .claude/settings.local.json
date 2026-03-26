@@ -8,7 +8,10 @@
       "Bash(.venv/Scripts/pytest tests/ -v 2>&1)",
       "Bash(.venv/Scripts/python -c \"from shelf import shelf; print\\('API import OK'\\)\" && .venv/Scripts/shelf --help | head -5)",
       "Bash(git init:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python -m pytest -q)",
+      "Bash(pip install:*)",
+      "Bash(cd:*)"
     ]
   }
 }
