@@ -9,13 +9,14 @@ from shelf.models import BookTree, Section
 _HEADER_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 
 
-def split_markdown(text: str, depth: int = 3, source_path: Path | None = None) -> BookTree:
+def split_markdown(text: str, depth: int | None = None, source_path: Path | None = None) -> BookTree:
     """Parse markdown into a BookTree.
 
     Args:
         text: Raw markdown text.
         depth: Maximum heading level to split (1=H1 only, 2=H1+H2, 3=H1-H3, etc.).
                Headers deeper than `depth` remain as body content.
+               If None, all heading levels present in the document are used.
         source_path: Optional path to the source file (stored on the tree).
 
     Returns:
@@ -23,14 +24,21 @@ def split_markdown(text: str, depth: int = 3, source_path: Path | None = None) -
     """
     lines = text.splitlines(keepends=True)
 
-    # Build flat list of (level, title, line_index) for headers within depth
-    headers: list[tuple[int, str, int]] = []
+    # Build flat list of (level, title, line_index) for all headers first
+    all_headers: list[tuple[int, str, int]] = []
     for i, line in enumerate(lines):
         m = _HEADER_RE.match(line.rstrip())
         if m:
             level = len(m.group(1))
-            if level <= depth:
-                headers.append((level, m.group(2).strip(), i))
+            all_headers.append((level, m.group(2).strip(), i))
+
+    # Determine effective depth
+    effective_depth = depth if depth is not None else (
+        max((lvl for lvl, _, _ in all_headers), default=6)
+    )
+
+    # Filter to headers within depth
+    headers = [(lvl, title, idx) for lvl, title, idx in all_headers if lvl <= effective_depth]
 
     # Determine the line ranges for each header's content
     # Content for header[i] runs from line after its header to line before header[i+1]

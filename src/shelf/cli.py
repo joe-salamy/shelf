@@ -17,9 +17,9 @@ from shelf.output import write_shelf
 )
 @click.option(
     "--depth", "-d",
-    default=3,
-    show_default=True,
-    help="Maximum heading depth to split into separate files (H1=chapters, H2=sections)",
+    default=None,
+    type=int,
+    help="Maximum heading depth to split into separate files (default: all heading levels found in the document)",
 )
 @click.option(
     "--summarize", "-s",
