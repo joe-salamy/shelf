@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv .venv 2>&1)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/shelf --help 2>&1)",
+      "Bash(.venv/Scripts/pip index:*)",
+      "Bash(.venv/Scripts/pytest tests/ -v 2>&1)",
+      "Bash(.venv/Scripts/python -c \"from shelf import shelf; print\\('API import OK'\\)\" && .venv/Scripts/shelf --help | head -5)",
+      "Bash(git init:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

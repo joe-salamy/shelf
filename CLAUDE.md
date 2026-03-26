@@ -1,0 +1,1 @@
+- Don't read or write to scratchpad.md
