@@ -10,3 +10,4 @@ build/
 htmlcov/
 *.egg
 docs/
+textbook-tests/

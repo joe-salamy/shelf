@@ -1,6 +1,7 @@
 """Write a BookTree to a nested directory of markdown files."""
 
 from __future__ import annotations
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,9 @@ from shelf.slugify import slugify
 
 if TYPE_CHECKING:
     from shelf.summarize import SmartIndex
+
+# Windows MAX_PATH is 260; reserve room for the prefix digits, separators, and .md
+_MAX_PATH = 260 if sys.platform == "win32" else 1024
 
 
 def write_shelf(
@@ -36,8 +40,15 @@ def write_shelf(
 
     chapter_dirs: list[tuple[str, Path, Section]] = []  # (slug, dir_path, section)
 
+    # Budget for slug lengths: total path must fit within _MAX_PATH.
+    # Path structure: output_dir / "NN-<ch_slug>" / "NN-<sec_slug>.md"
+    # Overhead: 2 seps + "NN-" prefix (3) + "NN-" prefix (3) + ".md" (3) = 11
+    slug_budget = _MAX_PATH - len(str(output_dir)) - 11
+    # Split budget evenly between chapter and section slugs (min 20 each)
+    max_slug = max(slug_budget // 2, 20)
+
     for ch_idx, chapter in enumerate(chapters, start=1):
-        ch_slug = slugify(chapter.title) or f"chapter-{ch_idx}"
+        ch_slug = slugify(chapter.title, max_length=max_slug) or f"chapter-{ch_idx}"
         ch_dir = output_dir / f"{ch_idx:02d}-{ch_slug}"
         ch_dir.mkdir(parents=True, exist_ok=True)
         chapter_dirs.append((ch_slug, ch_dir, chapter))
@@ -48,7 +59,7 @@ def write_shelf(
 
         # H2 sections → individual .md files
         for sec_idx, section in enumerate(chapter.children, start=1):
-            sec_slug = slugify(section.title) or f"section-{sec_idx}"
+            sec_slug = slugify(section.title, max_length=max_slug) or f"section-{sec_idx}"
             sec_file = ch_dir / f"{sec_idx:02d}-{sec_slug}.md"
             sec_content = _render_section(section)
             sec_file.write_text(sec_content, encoding="utf-8")
@@ -68,7 +79,7 @@ def write_shelf(
         ch_link = f"- [{chapter.title}]({ch_prefix}/README.md)"
         index_lines.append(f"{ch_link} — {ch_desc}" if ch_desc else ch_link)
         for sec_idx, section in enumerate(chapter.children, start=1):
-            sec_slug = slugify(section.title) or f"section-{sec_idx}"
+            sec_slug = slugify(section.title, max_length=max_slug) or f"section-{sec_idx}"
             sec_prefix = f"{sec_idx:02d}-{sec_slug}"
             sec_desc = descriptions.get(section.title, "")
             sec_link = f"  - [{section.title}]({ch_prefix}/{sec_prefix}.md)"

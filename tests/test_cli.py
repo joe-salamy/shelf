@@ -86,7 +86,7 @@ def test_shelf_prints_success_message(tmp_path):
     ):
         result = runner.invoke(main, [str(pdf), "--output", str(tmp_path / "out")])
 
-    assert "\u2713" in result.output
+    assert "Done!" in result.output
     assert "sections" in result.output
     assert "chapters" in result.output
     assert "CLAUDE.md" in result.output

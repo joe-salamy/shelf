@@ -64,9 +64,9 @@ def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
     rel_out = output_dir.name
 
     click.echo(
-        f"\u2713 Wrote {section_count} sections across {chapter_count} chapters \u2192 {rel_out}/"
+        f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
     )
-    click.echo(f"\u2713 Generated {rel_out}/CLAUDE.md")
+    click.echo(f"Generated {rel_out}/CLAUDE.md")
     click.echo(
         f"\nAdd this to your root CLAUDE.md to make this book discoverable:\n"
         f"  Reference textbooks are in ./{rel_out}/"
