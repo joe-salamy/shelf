@@ -63,9 +63,11 @@ def generate_book_summary(
 
     with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
         future_to_task = {
-            pool.submit(
-                _summarize_section, section, ch_title, backend, max_chars
-            ): (ch_title, sec_idx, section.title)
+            pool.submit(_summarize_section, section, ch_title, backend, max_chars): (
+                ch_title,
+                sec_idx,
+                section.title,
+            )
             for ch_title, sec_idx, section in tasks
         }
         for fut in as_completed(future_to_task):
@@ -158,9 +160,7 @@ def _summarize_section(
     # Multiple chunks: summarize each, then merge
     partials: list[SectionSummary] = []
     for chunk in chunks:
-        partials.append(
-            _call_section_llm(section.title, chapter_title, chunk, backend)
-        )
+        partials.append(_call_section_llm(section.title, chapter_title, chunk, backend))
     return _merge_section_summaries(section.title, chapter_title, partials)
 
 
@@ -376,7 +376,11 @@ def _dedup_relationships(relationships: list[Relationship]) -> list[Relationship
     seen: set[tuple[str, str, str]] = set()
     result: list[Relationship] = []
     for r in relationships:
-        key = (r.source.lower().strip(), r.relation.lower().strip(), r.target.lower().strip())
+        key = (
+            r.source.lower().strip(),
+            r.relation.lower().strip(),
+            r.target.lower().strip(),
+        )
         if key not in seen:
             seen.add(key)
             result.append(r)

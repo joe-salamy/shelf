@@ -99,15 +99,6 @@ def main(
 
             backend = get_backend()
 
-            # Preflight check: verify the LLM backend is reachable
-            try:
-                backend.summarize("Hello", "Reply with OK.")
-            except Exception as e:
-                raise click.ClickException(
-                    f"LLM backend check failed: {e}\n"
-                    "Verify your SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, and SHELF_LLM_MODEL."
-                )
-
             # Wrap backend with JSONL logger if --log is enabled
             if enable_log:
                 book_slug = slugify(input_path.stem)
