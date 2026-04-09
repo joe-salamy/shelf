@@ -28,10 +28,12 @@ def get_backend() -> LLMBackend:
     api_key = os.environ.get("SHELF_LLM_API_KEY")
     if api_key:
         from shelf.summarize.openai_compat import OpenAICompatBackend
+
         return OpenAICompatBackend()
 
     # Try Ollama
     from shelf.summarize.ollama import OllamaBackend
+
     backend = OllamaBackend()
     if backend.is_available():
         return backend

@@ -8,11 +8,25 @@ from shelf.output import write_shelf
 
 def _make_tree() -> BookTree:
     sub = Section(title="Subsection 1.1.1", level=3, content="Subsection content.")
-    sec1 = Section(title="Section One Point One", level=2, content="Section 1.1 content.", children=[sub])
-    sec2 = Section(title="Section One Point Two", level=2, content="Section 1.2 content.")
-    ch1 = Section(title="Chapter One", level=1, content="Chapter one intro.", children=[sec1, sec2])
+    sec1 = Section(
+        title="Section One Point One",
+        level=2,
+        content="Section 1.1 content.",
+        children=[sub],
+    )
+    sec2 = Section(
+        title="Section One Point Two", level=2, content="Section 1.2 content."
+    )
+    ch1 = Section(
+        title="Chapter One",
+        level=1,
+        content="Chapter one intro.",
+        children=[sec1, sec2],
+    )
     ch2 = Section(title="Chapter Two", level=1, content="Chapter two intro.")
-    return BookTree(title="Test Book", sections=[ch1, ch2], source_path=Path("test.pdf"))
+    return BookTree(
+        title="Test Book", sections=[ch1, ch2], source_path=Path("test.pdf")
+    )
 
 
 def test_output_directories_created(tmp_path):

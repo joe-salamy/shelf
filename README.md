@@ -10,6 +10,16 @@ Convert PDF and EPUB textbooks into nested, grep-friendly markdown directories â
 
 Requires Python 3.10+. Install shelf once â€” you don't need to repeat this for each project.
 
+**From the shelf repo directory:**
+
+```bash
+python -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -e .
+```
+
+**Or from anywhere, passing the path to the repo:**
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate    # Windows: .venv\Scripts\activate

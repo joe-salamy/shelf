@@ -11,7 +11,9 @@ if TYPE_CHECKING:
     from shelf.summarize import SmartIndex
 
 
-def write_shelf(tree: BookTree, output_dir: Path, smart_index: "SmartIndex | None" = None) -> None:
+def write_shelf(
+    tree: BookTree, output_dir: Path, smart_index: "SmartIndex | None" = None
+) -> None:
     """Materialize the BookTree as a nested markdown directory.
 
     Layout:
@@ -83,9 +85,7 @@ def write_shelf(tree: BookTree, output_dir: Path, smart_index: "SmartIndex | Non
     # CLAUDE.md
     chapter_count = len(chapters)
     section_count = sum(len(ch.children) for ch in chapters)
-    subsection_count = sum(
-        len(sec.children) for ch in chapters for sec in ch.children
-    )
+    subsection_count = sum(len(sec.children) for ch in chapters for sec in ch.children)
 
     claude_lines = [
         f"# {tree.title} — Navigation Guide",
@@ -157,6 +157,7 @@ def _render_subsection(section: Section, base_level: int) -> str:
 def _to_anchor(title: str) -> str:
     """Convert a heading title to a GitHub-style markdown anchor."""
     import re
+
     anchor = title.lower()
     anchor = re.sub(r"[^\w\s-]", "", anchor)
     anchor = re.sub(r"\s+", "-", anchor)

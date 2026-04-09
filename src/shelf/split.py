@@ -9,7 +9,9 @@ from shelf.models import BookTree, Section
 _HEADER_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 
 
-def split_markdown(text: str, depth: int | None = None, source_path: Path | None = None) -> BookTree:
+def split_markdown(
+    text: str, depth: int | None = None, source_path: Path | None = None
+) -> BookTree:
     """Parse markdown into a BookTree.
 
     Args:
@@ -33,12 +35,16 @@ def split_markdown(text: str, depth: int | None = None, source_path: Path | None
             all_headers.append((level, m.group(2).strip(), i))
 
     # Determine effective depth
-    effective_depth = depth if depth is not None else (
-        max((lvl for lvl, _, _ in all_headers), default=6)
+    effective_depth = (
+        depth
+        if depth is not None
+        else (max((lvl for lvl, _, _ in all_headers), default=6))
     )
 
     # Filter to headers within depth
-    headers = [(lvl, title, idx) for lvl, title, idx in all_headers if lvl <= effective_depth]
+    headers = [
+        (lvl, title, idx) for lvl, title, idx in all_headers if lvl <= effective_depth
+    ]
 
     # Determine the line ranges for each header's content
     # Content for header[i] runs from line after its header to line before header[i+1]
@@ -52,7 +58,9 @@ def split_markdown(text: str, depth: int | None = None, source_path: Path | None
     front_matter_text = _get_content(0, first_header_line)
 
     if front_matter_text:
-        top_sections.append(Section(title="Front Matter", level=1, content=front_matter_text))
+        top_sections.append(
+            Section(title="Front Matter", level=1, content=front_matter_text)
+        )
 
     # stack entries: (section, level)
     stack: list[tuple[Section, int]] = []

@@ -22,6 +22,7 @@ def shelf(input_path, output_dir=None, depth=3, summarize=False):
     smart_index = None
     if summarize:
         from shelf.summarize import generate_smart_index
+
         smart_index = generate_smart_index(tree)
 
     write_shelf(tree, output_dir, smart_index=smart_index)

@@ -24,10 +24,23 @@ Equal protection content.
 
 
 def _make_fake_tree():
-    sec1 = Section(title="Chapter 1: Due Process", level=2, content="Due process content.")
-    sec2 = Section(title="Chapter 2: Equal Protection", level=2, content="Equal protection content.")
-    ch = Section(title="Constitutional Law", level=1, content="Introduction.", children=[sec1, sec2])
-    return BookTree(title="Constitutional Law", sections=[ch], source_path=Path("test.pdf"))
+    sec1 = Section(
+        title="Chapter 1: Due Process", level=2, content="Due process content."
+    )
+    sec2 = Section(
+        title="Chapter 2: Equal Protection",
+        level=2,
+        content="Equal protection content.",
+    )
+    ch = Section(
+        title="Constitutional Law",
+        level=1,
+        content="Introduction.",
+        children=[sec1, sec2],
+    )
+    return BookTree(
+        title="Constitutional Law", sections=[ch], source_path=Path("test.pdf")
+    )
 
 
 def test_shelf_help():
@@ -48,9 +61,11 @@ def test_shelf_runs_end_to_end(tmp_path):
     fake_tree = _make_fake_tree()
 
     runner = CliRunner()
-    with patch("shelf.cli.convert", return_value=FAKE_MARKDOWN), \
-         patch("shelf.cli.split_markdown", return_value=fake_tree), \
-         patch("shelf.cli.write_shelf") as mock_write:
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf") as mock_write,
+    ):
         result = runner.invoke(main, [str(pdf), "--output", str(out_dir)])
 
     assert result.exit_code == 0
@@ -64,9 +79,11 @@ def test_shelf_prints_success_message(tmp_path):
     fake_tree = _make_fake_tree()
 
     runner = CliRunner()
-    with patch("shelf.cli.convert", return_value=FAKE_MARKDOWN), \
-         patch("shelf.cli.split_markdown", return_value=fake_tree), \
-         patch("shelf.cli.write_shelf"):
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf"),
+    ):
         result = runner.invoke(main, [str(pdf), "--output", str(tmp_path / "out")])
 
     assert "\u2713" in result.output
@@ -80,7 +97,9 @@ def test_shelf_unsupported_format(tmp_path):
     docx.write_text("content")
 
     runner = CliRunner()
-    with patch("shelf.cli.convert", side_effect=ValueError("Unsupported file type '.docx'")):
+    with patch(
+        "shelf.cli.convert", side_effect=ValueError("Unsupported file type '.docx'")
+    ):
         result = runner.invoke(main, [str(docx)])
 
     assert result.exit_code != 0
@@ -98,9 +117,11 @@ def test_shelf_default_output_dir(tmp_path):
         captured_args["output_dir"] = output_dir
 
     runner = CliRunner()
-    with patch("shelf.cli.convert", return_value=FAKE_MARKDOWN), \
-         patch("shelf.cli.split_markdown", return_value=fake_tree), \
-         patch("shelf.cli.write_shelf", side_effect=capture_write):
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf", side_effect=capture_write),
+    ):
         result = runner.invoke(main, [str(pdf)])
 
     assert "output_dir" in captured_args
@@ -113,13 +134,18 @@ def test_shelf_summarize_flag(tmp_path):
 
     fake_tree = _make_fake_tree()
     from shelf.summarize import SmartIndex
+
     fake_smart_index = SmartIndex(descriptions={}, overview="Test overview.")
 
     runner = CliRunner()
-    with patch("shelf.cli.convert", return_value=FAKE_MARKDOWN), \
-         patch("shelf.cli.split_markdown", return_value=fake_tree), \
-         patch("shelf.cli.write_shelf"), \
-         patch("shelf.summarize.generate_smart_index", return_value=fake_smart_index):
-        result = runner.invoke(main, [str(pdf), "--output", str(tmp_path / "out"), "--summarize"])
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf"),
+        patch("shelf.summarize.generate_smart_index", return_value=fake_smart_index),
+    ):
+        result = runner.invoke(
+            main, [str(pdf), "--output", str(tmp_path / "out"), "--summarize"]
+        )
 
     assert result.exit_code == 0

@@ -11,6 +11,7 @@ class OllamaBackend:
     def is_available(self) -> bool:
         """Check if Ollama is running locally."""
         import httpx
+
         try:
             resp = httpx.get(f"{self.base_url}/api/tags", timeout=2.0)
             return resp.status_code == 200
@@ -19,6 +20,7 @@ class OllamaBackend:
 
     def summarize(self, text: str, prompt: str) -> str:
         import httpx
+
         payload = {
             "model": self.model,
             "prompt": f"{prompt}\n\n{text}",

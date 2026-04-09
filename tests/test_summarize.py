@@ -9,18 +9,26 @@ from shelf.summarize import generate_smart_index, get_backend, SmartIndex
 
 class MockBackend:
     def summarize(self, text: str, prompt: str) -> str:
-        return json.dumps({
-            "descriptions": {
-                "Chapter 1": "First chapter covering basics.",
-                "Section 1.1": "Detailed look at subsection one.",
-            },
-            "overview": "This book covers constitutional law fundamentals.",
-        })
+        return json.dumps(
+            {
+                "descriptions": {
+                    "Chapter 1": "First chapter covering basics.",
+                    "Section 1.1": "Detailed look at subsection one.",
+                },
+                "overview": "This book covers constitutional law fundamentals.",
+            }
+        )
 
 
 def _make_tree() -> BookTree:
-    sec = Section(title="Section 1.1", level=2, content="Section content here. More details follow.")
-    ch = Section(title="Chapter 1", level=1, content="Chapter intro here.", children=[sec])
+    sec = Section(
+        title="Section 1.1",
+        level=2,
+        content="Section content here. More details follow.",
+    )
+    ch = Section(
+        title="Chapter 1", level=1, content="Chapter intro here.", children=[sec]
+    )
     return BookTree(title="Con Law", sections=[ch])
 
 

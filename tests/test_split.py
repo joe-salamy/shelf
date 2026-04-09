@@ -7,6 +7,7 @@ from shelf.models import BookTree, Section
 
 # --- Basic structure ---
 
+
 def test_basic_two_chapters(simple_markdown):
     tree = split_markdown(simple_markdown)
     chapters = [s for s in tree.sections if s.title != "Front Matter"]
@@ -46,6 +47,7 @@ def test_content_assigned_correctly(simple_markdown):
 
 # --- Front matter ---
 
+
 def test_front_matter_captured():
     md = "Some preamble text.\n\nMore preamble.\n\n# Chapter One\n\nContent.\n"
     tree = split_markdown(md)
@@ -62,6 +64,7 @@ def test_no_front_matter_when_starts_with_header():
 
 
 # --- Depth limiting ---
+
 
 def test_depth_1_no_sections():
     md = "# Chapter One\n\nContent.\n\n## Section 1.1\n\nSection content.\n"
@@ -90,6 +93,7 @@ def test_depth_3_captures_h3(simple_markdown):
 
 
 # --- Edge cases ---
+
 
 def test_no_headers():
     md = "Just some plain text.\nNo headers at all.\n"

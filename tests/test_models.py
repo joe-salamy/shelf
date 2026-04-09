@@ -7,9 +7,13 @@ from shelf.models import Section, BookTree
 def _make_tree():
     """Build a small test tree."""
     sub = Section(title="Subsection 1.1.1", level=3, content="sub content")
-    sec1 = Section(title="Section 1.1", level=2, content="sec 1.1 content", children=[sub])
+    sec1 = Section(
+        title="Section 1.1", level=2, content="sec 1.1 content", children=[sub]
+    )
     sec2 = Section(title="Section 1.2", level=2, content="sec 1.2 content")
-    ch1 = Section(title="Chapter One", level=1, content="ch1 content", children=[sec1, sec2])
+    ch1 = Section(
+        title="Chapter One", level=1, content="ch1 content", children=[sec1, sec2]
+    )
     ch2 = Section(title="Chapter Two", level=1, content="ch2 content")
     return BookTree(title="My Book", sections=[ch1, ch2])
 
@@ -29,7 +33,11 @@ def test_walk_order():
     tree = _make_tree()
     titles = [s.title for s in tree.walk()]
     assert titles == [
-        "Chapter One", "Section 1.1", "Subsection 1.1.1", "Section 1.2", "Chapter Two"
+        "Chapter One",
+        "Section 1.1",
+        "Subsection 1.1.1",
+        "Section 1.2",
+        "Chapter Two",
     ]
 
 

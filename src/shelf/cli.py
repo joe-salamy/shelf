@@ -10,19 +10,22 @@ from shelf.output import write_shelf
 @click.command()
 @click.argument("input_path", type=click.Path(exists=True, path_type=Path))
 @click.option(
-    "--output", "-o",
+    "--output",
+    "-o",
     default=None,
     type=click.Path(path_type=Path),
     help="Output directory (default: <input stem>/ in current directory)",
 )
 @click.option(
-    "--depth", "-d",
+    "--depth",
+    "-d",
     default=None,
     type=int,
     help="Maximum heading depth to split into separate files (default: all heading levels found in the document)",
 )
 @click.option(
-    "--summarize", "-s",
+    "--summarize",
+    "-s",
     is_flag=True,
     default=False,
     help="Generate a smart INDEX.md with one-line descriptions via a single LLM call (requires Ollama or API key)",
@@ -49,6 +52,7 @@ def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
         click.echo("Generating smart index...")
         try:
             from shelf.summarize import generate_smart_index
+
             smart_index = generate_smart_index(tree)
         except Exception as e:
             raise click.ClickException(f"Smart index generation failed: {e}")
