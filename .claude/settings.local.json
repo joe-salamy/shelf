@@ -11,7 +11,23 @@
       "Bash(git commit:*)",
       "Bash(python -m pytest -q)",
       "Bash(pip install:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(git push:*)",
+      "Bash(venv/Scripts/python -m pytest tests/test_slugify.py -v)",
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(rm -rf \"Intro to Statistical Thermodynamics - Molecular Perspective \\(Elstner, Cui, Gruden\\)\")",
+      "Bash(venv/Scripts/shelf \"C:\\\\Users\\\\joesa\\\\OneDrive\\\\Documents\\\\law-school-python\\\\shelf\\\\textbook-tests\\\\Intro to Statistical Thermodynamics - Molecular Perspective \\(Elstner, Cui, Gruden\\).epub\")",
+      "Bash(venv/Scripts/python -m pytest -v)",
+      "Bash(mv Intro to Statistical Thermodynamics - Molecular Perspective \\(Elstner, Cui, Gruden\\):*)",
+      "Bash(.venv/Scripts/python -m pytest tests/test_cli.py -v)",
+      "Bash(ls .venv/Scripts/py*)",
+      "Bash(ls venv/Scripts/py*)",
+      "Bash(venv/Scripts/python -m pytest tests/test_cli.py -v)",
+      "Bash(xargs wc:*)",
+      "Bash(find:*)",
+      "Bash(grep -E \"\\\\\\\\.md|\\\\\\\\.txt|\\\\\\\\.toml\")",
+      "Bash(git add:*)"
     ]
   }
 }
