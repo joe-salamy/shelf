@@ -10,4 +10,6 @@ build/
 htmlcov/
 *.egg
 docs/
+/shelf/
+.env
 textbook-tests/

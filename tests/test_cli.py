@@ -51,6 +51,8 @@ def test_shelf_help():
     assert "--output" in result.output
     assert "--summarize" in result.output
     assert "--depth" in result.output
+    assert "--index-filename" in result.output
+    assert "--max-section-chars" in result.output
 
 
 def test_shelf_runs_end_to_end(tmp_path):
@@ -113,7 +115,7 @@ def test_shelf_default_output_dir(tmp_path):
     fake_tree = _make_fake_tree()
     captured_args = {}
 
-    def capture_write(tree, output_dir, smart_index=None):
+    def capture_write(tree, output_dir, book_summary=None, index_filename="CLAUDE.md"):
         captured_args["output_dir"] = output_dir
 
     runner = CliRunner()
@@ -126,6 +128,7 @@ def test_shelf_default_output_dir(tmp_path):
 
     assert "output_dir" in captured_args
     assert captured_args["output_dir"].name == "my-textbook"
+    assert captured_args["output_dir"].parent.name == "shelf"
 
 
 def test_shelf_summarize_flag(tmp_path):
@@ -133,19 +136,46 @@ def test_shelf_summarize_flag(tmp_path):
     pdf.write_bytes(b"%PDF-1.4 fake")
 
     fake_tree = _make_fake_tree()
-    from shelf.summarize import SmartIndex
 
-    fake_smart_index = SmartIndex(descriptions={}, overview="Test overview.")
+    from shelf.summarize.models import BookSummary
+
+    fake_summary = BookSummary(overview="Test overview.", chapter_summaries=[])
 
     runner = CliRunner()
     with (
         patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
         patch("shelf.cli.split_markdown", return_value=fake_tree),
         patch("shelf.cli.write_shelf"),
-        patch("shelf.summarize.generate_smart_index", return_value=fake_smart_index),
+        patch("shelf.summarize.get_backend", return_value=MagicMock()),
+        patch(
+            "shelf.summarize.generate_book_summary",
+            return_value=fake_summary,
+        ),
     ):
         result = runner.invoke(
             main, [str(pdf), "--output", str(tmp_path / "out"), "--summarize"]
         )
 
+    assert result.exit_code == 0, result.output
+
+
+def test_shelf_index_filename_flag(tmp_path):
+    pdf = tmp_path / "test.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    fake_tree = _make_fake_tree()
+    captured_args = {}
+
+    def capture_write(tree, output_dir, book_summary=None, index_filename="CLAUDE.md"):
+        captured_args["index_filename"] = index_filename
+
+    runner = CliRunner()
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf", side_effect=capture_write),
+    ):
+        result = runner.invoke(main, [str(pdf), "--index-filename", "AGENTS.md"])
+
     assert result.exit_code == 0
+    assert captured_args["index_filename"] == "AGENTS.md"

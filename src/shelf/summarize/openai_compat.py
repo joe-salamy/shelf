@@ -2,6 +2,8 @@
 
 import os
 
+from shelf.summarize.exceptions import ContextWindowExceededError
+
 
 class OpenAICompatBackend:
     def __init__(self):
@@ -31,5 +33,20 @@ class OpenAICompatBackend:
             json=payload,
             timeout=120.0,
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if resp.status_code == 400:
+                try:
+                    body = resp.json()
+                    err = body.get("error", {})
+                    code = str(err.get("code", ""))
+                    message = str(err.get("message", ""))
+                    if "context_length" in code or "context length" in message:
+                        raise ContextWindowExceededError(
+                            self.model, detail=message
+                        ) from exc
+                except (ValueError, KeyError):
+                    pass
+            raise
         return resp.json()["choices"][0]["message"]["content"].strip()

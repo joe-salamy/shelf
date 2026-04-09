@@ -1,5 +1,13 @@
 """Click CLI for shelf."""
 
+import logging
+from datetime import datetime
+
+from dotenv import load_dotenv
+
+load_dotenv()
+logging.basicConfig(level=logging.WARNING)
+
 import click
 from pathlib import Path
 from shelf.convert import convert
@@ -14,7 +22,7 @@ from shelf.output import write_shelf
     "-o",
     default=None,
     type=click.Path(path_type=Path),
-    help="Output directory (default: <input stem>/ in current directory)",
+    help="Output directory (default: shelf/<input stem>/ in current directory)",
 )
 @click.option(
     "--depth",
@@ -28,15 +36,45 @@ from shelf.output import write_shelf
     "-s",
     is_flag=True,
     default=False,
-    help="Generate a smart INDEX.md with one-line descriptions via a single LLM call (requires Ollama or API key)",
+    help="Generate cascading CLAUDE.md summaries and entity indexes via LLM",
 )
-def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
+@click.option(
+    "--index-filename",
+    default="CLAUDE.md",
+    show_default=True,
+    help="Filename for navigation index files (e.g. AGENTS.md for non-Claude harnesses)",
+)
+@click.option(
+    "--max-section-chars",
+    default=24000,
+    type=int,
+    show_default=True,
+    help="Max characters per LLM call before splitting sections",
+)
+@click.option(
+    "--log",
+    "enable_log",
+    is_flag=True,
+    default=False,
+    help="Log all LLM request/response pairs to logs/<textbook>/",
+)
+def main(
+    input_path: Path,
+    output: Path | None,
+    depth: int,
+    summarize: bool,
+    index_filename: str,
+    max_section_chars: int,
+    enable_log: bool,
+):
     """Convert a PDF or EPUB textbook into a nested markdown directory.
 
     INPUT_PATH is the path to the PDF or EPUB file to convert.
     """
 
-    output_dir = output if output is not None else Path.cwd() / input_path.stem
+    output_dir = (
+        output if output is not None else Path.cwd() / "shelf" / input_path.stem
+    )
 
     click.echo(f"Converting {input_path.name}...")
     try:
@@ -47,27 +85,96 @@ def main(input_path: Path, output: Path | None, depth: int, summarize: bool):
     click.echo("Splitting into sections...")
     tree = split_markdown(markdown, depth=depth, source_path=input_path)
 
-    smart_index = None
+    book_summary = None
     if summarize:
-        click.echo("Generating smart index...")
+        click.echo("Generating summaries and entity indexes...")
         try:
-            from shelf.summarize import generate_smart_index
+            from shelf.summarize import (
+                ContextWindowExceededError,
+                generate_book_summary,
+                get_backend,
+            )
+            from shelf.summarize.logging_backend import LoggingBackend
+            from shelf.slugify import slugify
 
-            smart_index = generate_smart_index(tree)
+            backend = get_backend()
+
+            # Preflight check: verify the LLM backend is reachable
+            try:
+                backend.summarize("Hello", "Reply with OK.")
+            except Exception as e:
+                raise click.ClickException(
+                    f"LLM backend check failed: {e}\n"
+                    "Verify your SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, and SHELF_LLM_MODEL."
+                )
+
+            # Wrap backend with JSONL logger if --log is enabled
+            if enable_log:
+                book_slug = slugify(input_path.stem)
+                log_file = (
+                    Path.cwd()
+                    / "logs"
+                    / book_slug
+                    / f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.jsonl"
+                )
+                backend = LoggingBackend(backend, log_file)
+                click.echo(f"  Logging LLM calls to {log_file.relative_to(Path.cwd())}")
+
+            book_summary = generate_book_summary(
+                tree,
+                backend,
+                max_chars=max_section_chars,
+                on_progress=lambda msg: click.echo(f"  {msg}"),
+            )
+        except ContextWindowExceededError as e:
+            raise click.ClickException(
+                f"Context window exceeded: {e}\n"
+                "Try reducing --max-section-chars or using a model with a larger context window."
+            )
+        except click.ClickException:
+            raise
         except Exception as e:
-            raise click.ClickException(f"Smart index generation failed: {e}")
+            raise click.ClickException(f"Summarization failed: {e}")
 
-    write_shelf(tree, output_dir, smart_index=smart_index)
+    write_shelf(
+        tree, output_dir, book_summary=book_summary, index_filename=index_filename
+    )
 
     chapter_count = tree.chapter_count()
     section_count = tree.section_count()
-    rel_out = output_dir.name
+    try:
+        rel_out = output_dir.relative_to(Path.cwd())
+    except ValueError:
+        rel_out = output_dir
 
     click.echo(
         f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
     )
-    click.echo(f"Generated {rel_out}/CLAUDE.md")
+    click.echo(f"Generated {rel_out}/{index_filename}")
+
+    if book_summary:
+        click.echo(f"Generated {rel_out}/ENTITIES.md and {rel_out}/GRAPH.md")
+
+    # Suggest how to make the book discoverable
     click.echo(
         f"\nAdd this to your root CLAUDE.md to make this book discoverable:\n"
         f"  Reference textbooks are in ./{rel_out}/"
     )
+
+    # Auto-append pointer to root CLAUDE.md if output dir was actually created
+    root_claude = Path.cwd() / "CLAUDE.md"
+    if root_claude.exists() and output_dir.exists():
+        try:
+            output_dir.resolve().relative_to(Path.cwd().resolve())
+        except ValueError:
+            pass  # output dir is outside cwd — skip
+        else:
+            existing = root_claude.read_text(encoding="utf-8")
+            pointer_line = f"\nReference textbooks are in ./{rel_out}/\n"
+            if str(rel_out) not in existing:
+                try:
+                    with root_claude.open("a", encoding="utf-8") as f:
+                        f.write(pointer_line)
+                    click.echo(f"  (Auto-appended to {root_claude.name})")
+                except OSError:
+                    pass

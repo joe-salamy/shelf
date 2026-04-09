@@ -1,0 +1,347 @@
+"""Bottom-up summarization pipeline: section → chapter → book."""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from typing import Callable
+
+from shelf.models import BookTree, Section
+from shelf.summarize.base import LLMBackend
+from shelf.summarize.exceptions import ContextWindowExceededError
+
+logger = logging.getLogger(__name__)
+from shelf.summarize.models import (
+    BookSummary,
+    ChapterSummary,
+    Entity,
+    Relationship,
+    SectionSummary,
+)
+from shelf.summarize.prompts import (
+    BOOK_ROLLUP_PROMPT,
+    CHAPTER_ROLLUP_PROMPT,
+    SECTION_PROMPT,
+)
+from shelf.summarize.splitter import split_section_content
+
+
+def generate_book_summary(
+    tree: BookTree,
+    backend: LLMBackend,
+    max_chars: int = 24_000,
+    on_progress: Callable[[str], None] | None = None,
+) -> BookSummary:
+    """Run the full bottom-up summarization pipeline."""
+
+    def _log(msg: str) -> None:
+        if on_progress:
+            on_progress(msg)
+
+    chapters = [s for s in tree.sections if s.title != "Front Matter"]
+
+    # Collect all H2 sections across chapters for progress counting
+    total_sections = sum(len(ch.children) for ch in chapters)
+    section_idx = 0
+
+    # --- Phase 1: section summaries ---
+    chapter_section_summaries: dict[str, list[SectionSummary]] = {}
+    for chapter in chapters:
+        section_sums: list[SectionSummary] = []
+        for section in chapter.children:
+            section_idx += 1
+            _log(f"Section {section_idx}/{total_sections}: {section.title}")
+            ss = _summarize_section(
+                section, chapter.title, backend, max_chars
+            )
+            section_sums.append(ss)
+        chapter_section_summaries[chapter.title] = section_sums
+
+    # --- Phase 2: chapter rollups ---
+    chapter_summaries: list[ChapterSummary] = []
+    for ch_idx, chapter in enumerate(chapters, start=1):
+        _log(f"Chapter {ch_idx}/{len(chapters)}: {chapter.title}")
+        sec_sums = chapter_section_summaries[chapter.title]
+        cs = _rollup_chapter(chapter.title, sec_sums, backend)
+        chapter_summaries.append(cs)
+
+    # --- Phase 3: book rollup ---
+    _log("Generating book overview...")
+    overview = _rollup_book(chapter_summaries, backend)
+
+    all_entities = _dedup_entities(
+        [e for cs in chapter_summaries for e in cs.entities]
+    )
+    all_relationships = _dedup_relationships(
+        [r for cs in chapter_summaries for r in cs.relationships]
+    )
+
+    return BookSummary(
+        overview=overview,
+        chapter_summaries=chapter_summaries,
+        all_entities=all_entities,
+        all_relationships=all_relationships,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 helpers
+# ---------------------------------------------------------------------------
+
+
+def _render_section_text(section: Section) -> str:
+    """Render a section and its children as plain markdown text."""
+    parts = [f"## {section.title}\n\n{section.content}"]
+    for child in section.children:
+        parts.append(_render_child(child, level=3))
+    return "\n\n".join(parts)
+
+
+def _render_child(section: Section, level: int) -> str:
+    hashes = "#" * level
+    parts = [f"{hashes} {section.title}\n\n{section.content}"]
+    for child in section.children:
+        parts.append(_render_child(child, level + 1))
+    return "\n\n".join(parts)
+
+
+def _summarize_section(
+    section: Section,
+    chapter_title: str,
+    backend: LLMBackend,
+    max_chars: int,
+) -> SectionSummary:
+    """Summarize a single H2 section, splitting if needed."""
+    content = _render_section_text(section)
+    chunks = split_section_content(content, max_chars)
+
+    if len(chunks) == 1:
+        return _call_section_llm(section.title, chapter_title, chunks[0], backend)
+
+    # Multiple chunks: summarize each, then merge
+    partials: list[SectionSummary] = []
+    for chunk in chunks:
+        partials.append(
+            _call_section_llm(section.title, chapter_title, chunk, backend)
+        )
+    return _merge_section_summaries(section.title, chapter_title, partials)
+
+
+def _call_section_llm(
+    section_title: str,
+    chapter_title: str,
+    content: str,
+    backend: LLMBackend,
+) -> SectionSummary:
+    """Make one LLM call for a section (or chunk) and parse the result."""
+    try:
+        raw = backend.summarize(content, SECTION_PROMPT)
+    except ContextWindowExceededError:
+        raise
+    except Exception as exc:
+        logger.warning("LLM call failed for section '%s': %s", section_title, exc)
+        return _degraded_section(section_title, chapter_title)
+
+    return _parse_section_response(raw, section_title, chapter_title)
+
+
+def _parse_section_response(
+    raw: str, section_title: str, chapter_title: str
+) -> SectionSummary:
+    """Parse LLM JSON response into a SectionSummary."""
+    json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not json_match:
+        return SectionSummary(
+            section_title=section_title,
+            chapter_title=chapter_title,
+            summary=raw.strip() or "[Summarization failed]",
+        )
+
+    try:
+        data = json.loads(json_match.group())
+    except json.JSONDecodeError:
+        return SectionSummary(
+            section_title=section_title,
+            chapter_title=chapter_title,
+            summary=raw.strip() or "[Summarization failed]",
+        )
+
+    entities = [
+        Entity(
+            name=e.get("name", ""),
+            kind=e.get("kind", "concept"),
+            definition=e.get("definition", ""),
+        )
+        for e in data.get("entities", [])
+        if isinstance(e, dict) and e.get("name")
+    ]
+    relationships = [
+        Relationship(
+            source=r.get("source", ""),
+            relation=r.get("relation", ""),
+            target=r.get("target", ""),
+        )
+        for r in data.get("relationships", [])
+        if isinstance(r, dict) and r.get("source") and r.get("target")
+    ]
+
+    return SectionSummary(
+        section_title=section_title,
+        chapter_title=chapter_title,
+        summary=data.get("summary", raw.strip()),
+        key_points=data.get("key_points", []),
+        entities=entities,
+        relationships=relationships,
+        prerequisites=data.get("prerequisites", []),
+        leads_to=data.get("leads_to", []),
+    )
+
+
+def _degraded_section(section_title: str, chapter_title: str) -> SectionSummary:
+    return SectionSummary(
+        section_title=section_title,
+        chapter_title=chapter_title,
+        summary="[Summarization failed]",
+    )
+
+
+def _merge_section_summaries(
+    section_title: str,
+    chapter_title: str,
+    partials: list[SectionSummary],
+) -> SectionSummary:
+    """Merge multiple partial SectionSummary objects from chunk splitting."""
+    summaries = [p.summary for p in partials if p.summary != "[Summarization failed]"]
+    key_points: list[str] = []
+    entities: list[Entity] = []
+    relationships: list[Relationship] = []
+    prerequisites: list[str] = []
+    leads_to: list[str] = []
+
+    for p in partials:
+        key_points.extend(p.key_points)
+        entities.extend(p.entities)
+        relationships.extend(p.relationships)
+        prerequisites.extend(p.prerequisites)
+        leads_to.extend(p.leads_to)
+
+    return SectionSummary(
+        section_title=section_title,
+        chapter_title=chapter_title,
+        summary=" ".join(summaries) if summaries else "[Summarization failed]",
+        key_points=key_points,
+        entities=_dedup_entities(entities),
+        relationships=_dedup_relationships(relationships),
+        prerequisites=list(dict.fromkeys(prerequisites)),
+        leads_to=list(dict.fromkeys(leads_to)),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 helpers
+# ---------------------------------------------------------------------------
+
+
+def _rollup_chapter(
+    chapter_title: str,
+    section_summaries: list[SectionSummary],
+    backend: LLMBackend,
+) -> ChapterSummary:
+    """Roll up section summaries into a chapter summary."""
+    # Build input text for the LLM
+    lines = [f"Chapter: {chapter_title}\n"]
+    for ss in section_summaries:
+        lines.append(f"## {ss.section_title}")
+        lines.append(ss.summary)
+        if ss.key_points:
+            lines.append("Key points:")
+            for kp in ss.key_points:
+                lines.append(f"- {kp}")
+        lines.append("")
+    input_text = "\n".join(lines)
+
+    summary = chapter_title  # fallback
+    try:
+        raw = backend.summarize(input_text, CHAPTER_ROLLUP_PROMPT)
+        json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group())
+            summary = data.get("summary", raw.strip())
+        else:
+            summary = raw.strip()
+    except ContextWindowExceededError:
+        raise
+    except Exception as exc:
+        logger.warning("Chapter rollup failed for '%s': %s", chapter_title, exc)
+        summary = "[Chapter summarization failed]"
+
+    # Merge entities and relationships from all sections
+    all_ents = [e for ss in section_summaries for e in ss.entities]
+    all_rels = [r for ss in section_summaries for r in ss.relationships]
+
+    return ChapterSummary(
+        chapter_title=chapter_title,
+        summary=summary,
+        section_summaries=section_summaries,
+        entities=_dedup_entities(all_ents),
+        relationships=_dedup_relationships(all_rels),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 helpers
+# ---------------------------------------------------------------------------
+
+
+def _rollup_book(
+    chapter_summaries: list[ChapterSummary],
+    backend: LLMBackend,
+) -> str:
+    """Roll up chapter summaries into a book overview."""
+    lines = []
+    for cs in chapter_summaries:
+        lines.append(f"## {cs.chapter_title}")
+        lines.append(cs.summary)
+        lines.append("")
+    input_text = "\n".join(lines)
+
+    try:
+        raw = backend.summarize(input_text, BOOK_ROLLUP_PROMPT)
+        json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group())
+            return data.get("overview", raw.strip())
+        return raw.strip()
+    except ContextWindowExceededError:
+        raise
+    except Exception as exc:
+        logger.warning("Book rollup failed: %s", exc)
+        return "[Book overview generation failed]"
+
+
+# ---------------------------------------------------------------------------
+# Deduplication helpers
+# ---------------------------------------------------------------------------
+
+
+def _dedup_entities(entities: list[Entity]) -> list[Entity]:
+    """Deduplicate entities by (name, kind), keeping the longer definition."""
+    seen: dict[tuple[str, str], Entity] = {}
+    for e in entities:
+        key = (e.name.lower().strip(), e.kind)
+        if key not in seen or len(e.definition) > len(seen[key].definition):
+            seen[key] = e
+    return list(seen.values())
+
+
+def _dedup_relationships(relationships: list[Relationship]) -> list[Relationship]:
+    """Deduplicate relationships by (source, relation, target)."""
+    seen: set[tuple[str, str, str]] = set()
+    result: list[Relationship] = []
+    for r in relationships:
+        key = (r.source.lower().strip(), r.relation.lower().strip(), r.target.lower().strip())
+        if key not in seen:
+            seen.add(key)
+            result.append(r)
+    return result

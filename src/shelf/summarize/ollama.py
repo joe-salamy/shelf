@@ -2,6 +2,8 @@
 
 import os
 
+from shelf.summarize.exceptions import ContextWindowExceededError
+
 
 class OllamaBackend:
     def __init__(self):
@@ -31,5 +33,22 @@ class OllamaBackend:
             json=payload,
             timeout=120.0,
         )
-        resp.raise_for_status()
-        return resp.json()["response"].strip()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            try:
+                body = resp.json()
+                err_msg = str(body.get("error", ""))
+                if "context" in err_msg.lower():
+                    raise ContextWindowExceededError(
+                        self.model, detail=err_msg
+                    ) from exc
+            except (ValueError, KeyError):
+                pass
+            raise
+        data = resp.json()
+        if "error" in data:
+            err_msg = str(data["error"])
+            if "context" in err_msg.lower():
+                raise ContextWindowExceededError(self.model, detail=err_msg)
+        return data["response"].strip()

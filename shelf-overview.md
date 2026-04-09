@@ -45,22 +45,23 @@ $ shelf textbook.pdf
 That's it. Shelf reads the PDF, extracts text using pymupdf4llm (which handles the edge cases that break naive extraction), detects the table of contents from markdown header structure, and writes a nested directory tree.
 
 ```
-textbook/
-├── INDEX.md
-├── 01-introduction/
-│   ├── README.md
-│   └── 01-what-is-constitutional-law.md
-├── 02-judicial-review/
-│   ├── README.md
-│   ├── 01-marbury-v-madison.md
-│   ├── 02-scope-of-review.md
-│   └── 03-standards-of-scrutiny.md
-├── 03-the-commerce-clause/
-│   ├── README.md
-│   ├── 01-original-understanding.md
-│   ├── 02-the-new-deal-shift.md
-│   └── 03-modern-doctrine.md
-...
+shelf/
+└── textbook/
+    ├── INDEX.md
+    ├── 01-introduction/
+    │   ├── README.md
+    │   └── 01-what-is-constitutional-law.md
+    ├── 02-judicial-review/
+    │   ├── README.md
+    │   ├── 01-marbury-v-madison.md
+    │   ├── 02-scope-of-review.md
+    │   └── 03-standards-of-scrutiny.md
+    ├── 03-the-commerce-clause/
+    │   ├── README.md
+    │   ├── 01-original-understanding.md
+    │   ├── 02-the-new-deal-shift.md
+    │   └── 03-modern-doctrine.md
+    ...
 ```
 
 The `INDEX.md` at the root is a navigable table of contents with relative links to every section file — something like:
@@ -88,13 +89,13 @@ Once the shelf output exists, an agent navigates it the same way it navigates an
 
 ```
 # Find all sections mentioning "rational basis"
-$ grep -r "rational basis" textbook/ --include="*.md" -l
+$ grep -r "rational basis" shelf/textbook/ --include="*.md" -l
 
 # Read the section on standards of scrutiny
-$ cat textbook/02-judicial-review/03-standards-of-scrutiny.md
+$ cat shelf/textbook/02-judicial-review/03-standards-of-scrutiny.md
 
 # List all chapters in Part III
-$ ls textbook/03-the-commerce-clause/
+$ ls shelf/textbook/03-the-commerce-clause/
 ```
 
 In Claude Code, this looks like:
@@ -103,7 +104,7 @@ In Claude Code, this looks like:
 > What does this textbook say about the limits of the commerce clause
   after Lopez?
 
-[Claude globs textbook/03-the-commerce-clause/, reads the relevant
+[Claude globs shelf/textbook/03-the-commerce-clause/, reads the relevant
 sections, synthesizes an answer grounded in the actual text]
 ```
 
@@ -148,7 +149,7 @@ No AI required here. The structural information is already present in the markdo
 
 The output layer writes the directory tree, creates `README.md` files for each chapter directory (containing the chapter's introductory content), and generates `INDEX.md` with the full linked table of contents.
 
-Filename conventions are configurable: slug style (default), numbered, or title-cased. Output directory defaults to `<input-filename>/` in the current directory.
+Filename conventions are configurable: slug style (default), numbered, or title-cased. Output directory defaults to `shelf/<input-filename>/` in the current directory.
 
 ### Optional AI Layer
 
@@ -200,7 +201,7 @@ by Kathleen Sullivan and Noah Feldman (19th ed.).
 - Source: PDF converted via Shelf v0.1
 ```
 
-This file lives at `constitutional-law/CLAUDE.md`. Ten textbooks means ten self-contained CLAUDE.md files — each loaded only when the agent enters that book's directory. No context bloat at the project level.
+This file lives at `shelf/constitutional-law/CLAUDE.md`. Ten textbooks means ten self-contained CLAUDE.md files — each loaded only when the agent enters that book's directory. No context bloat at the project level.
 
 ### Discovery
 
@@ -209,12 +210,12 @@ After conversion, Shelf prints a one-liner the user can paste into their root CL
 ```
 $ shelf constitutional-law.pdf
 
-✓ Wrote 42 sections across 8 chapters → constitutional-law/
-✓ Generated constitutional-law/CLAUDE.md
+✓ Wrote 42 sections across 8 chapters → shelf/constitutional-law/
+✓ Generated shelf/constitutional-law/CLAUDE.md
 
 Add this to your root CLAUDE.md to make this book discoverable:
 
-  Reference textbooks are in ./constitutional-law/
+  Reference textbooks are in ./shelf/constitutional-law/
 ```
 
 Non-invasive. Shelf doesn't touch your project's root CLAUDE.md — it just tells you what to add.
@@ -226,10 +227,10 @@ What this looks like in practice, inside Claude Code:
 ```
 > What's the textbook's treatment of rational basis review?
 
-[Glob: constitutional-law/*/**.md → 42 files found]
+[Glob: shelf/constitutional-law/*/**.md → 42 files found]
 [Grep: "rational basis" → 8 matches in 4 files]
-[Read: constitutional-law/02-judicial-review/03-standards-of-scrutiny.md]
-[Read: constitutional-law/05-equal-protection/02-tiered-scrutiny.md]
+[Read: shelf/constitutional-law/02-judicial-review/03-standards-of-scrutiny.md]
+[Read: shelf/constitutional-law/05-equal-protection/02-tiered-scrutiny.md]
 
 The textbook distinguishes two flavors of rational basis...
 ```

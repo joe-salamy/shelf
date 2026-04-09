@@ -15,3 +15,5 @@
 ## Plan Mode
 
 - Be liberal with asking questions; when in doubt, ask more rather than fewer.
+
+Reference textbooks are in ./shelf\Intro to Statistical Thermodynamics - Molecular Perspective (Elstner, Cui, Gruden)/

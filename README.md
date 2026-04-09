@@ -38,25 +38,25 @@ Here's what a typical session looks like using this with Claude Code:
 
 ```bash
 cd ~/law-school-notes          # wherever you keep your notes
-shelf ~/Downloads/con-law.pdf  # creates con-law/ here
+shelf ~/Downloads/con-law.pdf  # creates shelf/con-law/ here
 ```
 
-Shelf creates the output directory (`con-law/`) in your current working directory. **You don't move the textbook** — just pass its path.
+Shelf creates the output directory (`shelf/con-law/`) in your current working directory. **You don't move the textbook** — just pass its path.
 
 **2. Tell Claude Code it exists** by adding one line to your project's `CLAUDE.md`:
 
 ```markdown
-Reference textbooks are in ./con-law/
+Reference textbooks are in ./shelf/con-law/
 ```
 
-Shelf prints this suggested line after conversion. Shelf also generates its own `CLAUDE.md` inside `con-law/` that Claude Code loads automatically when it reads files in that directory.
+Shelf prints this suggested line after conversion. Shelf also generates its own `CLAUDE.md` inside `shelf/con-law/` that Claude Code loads automatically when it reads files in that directory.
 
 **3. Ask Claude Code questions about the textbook:**
 
 ```
 > What does the textbook say about rational basis review?
 
-[Claude globs con-law/*/*.md, greps for "rational basis", reads the relevant sections]
+[Claude globs shelf/con-law/*/*.md, greps for "rational basis", reads the relevant sections]
 
 The textbook distinguishes two flavors of rational basis...
 ```
@@ -89,7 +89,7 @@ The `INDEX.md` is a full linked table of contents. The `CLAUDE.md` describes the
 ## Usage
 
 ```bash
-# Convert a PDF (output goes to ./textbook/ in your current directory)
+# Convert a PDF (output goes to ./shelf/textbook/ in your current directory)
 shelf textbook.pdf
 
 # Convert an EPUB
@@ -106,8 +106,8 @@ shelf textbook.pdf --summarize
 
 | Flag                | Default           | Description                          |
 | ------------------- | ----------------- | ------------------------------------ |
-| `--output`, `-o`    | textbook filename | Output directory                     |
-| `--depth`           | `3`               | Heading levels to split (1–6)        |
+| `--output`, `-o`    | `shelf/<filename>` | Output directory                     |
+| `--depth`           | `3`                | Heading levels to split (1–6)        |
 | `--summarize`, `-s` | off               | Prepend AI summaries to each section |
 
 ---
