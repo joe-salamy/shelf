@@ -35,6 +35,7 @@ def generate_book_summary(
     backend: LLMBackend,
     max_chars: int = 24_000,
     on_progress: Callable[[str], None] | None = None,
+    section_limit: int | None = None,
 ) -> BookSummary:
     """Run the full bottom-up summarization pipeline."""
 
@@ -55,6 +56,10 @@ def generate_book_summary(
     for chapter in chapters:
         for sec_idx, section in enumerate(chapter.children):
             tasks.append((chapter.title, sec_idx, section))
+
+    if section_limit is not None:
+        tasks = tasks[:section_limit]
+        total_sections = len(tasks)
 
     # Pre-allocate ordered lists per chapter
     chapter_section_summaries: dict[str, list[SectionSummary | None]] = {
@@ -78,13 +83,28 @@ def generate_book_summary(
                 progress_counter += 1
                 _log(f"Section {progress_counter}/{total_sections}: {sec_title}")
 
-    # Cast away the None placeholders (all filled by now)
-    filled_summaries: dict[str, list[SectionSummary]] = {
-        k: list(v) for k, v in chapter_section_summaries.items()  # type: ignore[arg-type]
-    }
+    # Cast away the None placeholders (all filled by now in unlimited mode;
+    # in limited mode, filter out sections that weren't summarized)
+    if section_limit is not None:
+        filled_summaries: dict[str, list[SectionSummary]] = {
+            k: [s for s in v if s is not None]
+            for k, v in chapter_section_summaries.items()
+            if any(s is not None for s in v)
+        }
+    else:
+        filled_summaries = {
+            k: list(v) for k, v in chapter_section_summaries.items()  # type: ignore[arg-type]
+        }
 
     # --- Phase 2: chapter rollups (parallel) ---
-    chapter_summaries: list[ChapterSummary | None] = [None] * len(chapters)
+    # When section_limit is active, only roll up chapters that had sections summarized
+    if section_limit is not None:
+        summarized_titles = {ch_title for ch_title, _, _ in tasks}
+        rollup_chapters = [ch for ch in chapters if ch.title in summarized_titles]
+    else:
+        rollup_chapters = chapters
+
+    chapter_summaries: list[ChapterSummary | None] = [None] * len(rollup_chapters)
 
     with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
         future_to_idx = {
@@ -94,11 +114,13 @@ def generate_book_summary(
                 filled_summaries[ch.title],
                 backend,
             ): idx
-            for idx, ch in enumerate(chapters)
+            for idx, ch in enumerate(rollup_chapters)
         }
         for fut in as_completed(future_to_idx):
             idx = future_to_idx[fut]
-            _log(f"Chapter {idx + 1}/{len(chapters)}: {chapters[idx].title}")
+            _log(
+                f"Chapter {idx + 1}/{len(rollup_chapters)}: {rollup_chapters[idx].title}"
+            )
             chapter_summaries[idx] = fut.result()
 
     # All slots filled — narrow the type

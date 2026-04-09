@@ -58,6 +58,20 @@ from shelf.output import write_shelf
     default=False,
     help="Log all LLM request/response pairs to logs/<textbook>/",
 )
+@click.option(
+    "--test",
+    "-t",
+    is_flag=True,
+    default=False,
+    help="Test mode: only summarize the first 5 sections (implies --summarize)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help="Skip cost-estimate confirmation prompt",
+)
 def main(
     input_path: Path,
     output: Path | None,
@@ -66,6 +80,8 @@ def main(
     index_filename: str,
     max_section_chars: int,
     enable_log: bool,
+    test: bool,
+    yes: bool,
 ):
     """Convert a PDF or EPUB textbook into a nested markdown directory.
 
@@ -85,6 +101,10 @@ def main(
     click.echo("Splitting into sections...")
     tree = split_markdown(markdown, depth=depth, source_path=input_path)
 
+    if test:
+        summarize = True
+        click.echo("Test mode: limiting to first 5 section summaries")
+
     book_summary = None
     if summarize:
         click.echo("Generating summaries and entity indexes...")
@@ -98,6 +118,37 @@ def main(
             from shelf.slugify import slugify
 
             backend = get_backend()
+
+            # Cost estimate & approval
+            from shelf.summarize.estimate import estimate_cost
+
+            section_lim = 5 if test else None
+            est = estimate_cost(tree, max_chars=max_section_chars, section_limit=section_lim)
+
+            click.echo("\nEstimated LLM usage:")
+            click.echo(
+                f"  Sections:  ~{est.phase1_input_tokens:,} input / "
+                f"~{est.phase1_output_tokens:,} output tokens "
+                f"({est.phase1_llm_calls} calls)"
+            )
+            click.echo(
+                f"  Chapters:  ~{est.phase2_input_tokens:,} input / "
+                f"~{est.phase2_output_tokens:,} output tokens "
+                f"({est.phase2_llm_calls} calls)"
+            )
+            click.echo(
+                f"  Book:      ~{est.phase3_input_tokens:,} input / "
+                f"~{est.phase3_output_tokens:,} output tokens "
+                f"({est.phase3_llm_calls} calls)"
+            )
+            click.echo(
+                f"  Total:     ~{est.total_input_tokens:,} input / "
+                f"~{est.total_output_tokens:,} output tokens"
+            )
+            click.echo(f"  Est. cost: ${est.total_cost_usd:.4f}\n")
+
+            if not yes:
+                click.confirm("Proceed?", default=True, abort=True)
 
             # Wrap backend with JSONL logger if --log is enabled
             if enable_log:
@@ -116,6 +167,7 @@ def main(
                 backend,
                 max_chars=max_section_chars,
                 on_progress=lambda msg: click.echo(f"  {msg}"),
+                section_limit=5 if test else None,
             )
         except ContextWindowExceededError as e:
             raise click.ClickException(

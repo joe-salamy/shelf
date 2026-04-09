@@ -27,6 +27,7 @@ class OpenAICompatBackend:
         }
         payload = {
             "model": self.model,
+            "temperature": 0,
             "messages": [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": text},
