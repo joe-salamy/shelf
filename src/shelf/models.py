@@ -36,5 +36,5 @@ class BookTree:
         return len(self.sections)
 
     def section_count(self) -> int:
-        """Count all sections at all levels."""
-        return sum(1 for _ in self.walk())
+        """Count all sections below chapter level."""
+        return sum(1 for _ in self.walk()) - len(self.sections)

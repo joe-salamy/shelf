@@ -25,8 +25,8 @@ def test_chapter_count():
 
 def test_section_count():
     tree = _make_tree()
-    # ch1 + sec1 + sub + sec2 + ch2 = 5
-    assert tree.section_count() == 5
+    # sec1 + sub + sec2 = 3 (chapters excluded)
+    assert tree.section_count() == 3
 
 
 def test_walk_order():
