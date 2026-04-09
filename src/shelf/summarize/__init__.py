@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import os
-
+from shelf.config import SHELF_LLM_API_KEY
 from shelf.summarize.base import LLMBackend
 from shelf.summarize.exceptions import ContextWindowExceededError
 from shelf.summarize.models import BookSummary
@@ -19,7 +18,7 @@ __all__ = [
 
 def get_backend() -> LLMBackend:
     """Return the appropriate LLM backend based on environment variables."""
-    api_key = os.environ.get("SHELF_LLM_API_KEY")
+    api_key = SHELF_LLM_API_KEY
     if api_key:
         from shelf.summarize.openai_compat import OpenAICompatBackend
 

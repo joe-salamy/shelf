@@ -1,14 +1,13 @@
 """Ollama local LLM backend."""
 
-import os
-
+from shelf.config import SHELF_OLLAMA_MODEL, SHELF_OLLAMA_URL
 from shelf.summarize.exceptions import ContextWindowExceededError
 
 
 class OllamaBackend:
     def __init__(self):
-        self.base_url = os.environ.get("SHELF_OLLAMA_URL", "http://localhost:11434")
-        self.model = os.environ.get("SHELF_OLLAMA_MODEL", "llama3")
+        self.base_url = SHELF_OLLAMA_URL
+        self.model = SHELF_OLLAMA_MODEL
 
     def is_available(self) -> bool:
         """Check if Ollama is running locally."""

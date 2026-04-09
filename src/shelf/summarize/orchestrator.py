@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
 
+from shelf.config import SHELF_PARALLEL_WORKERS
 from shelf.models import BookTree, Section
 from shelf.summarize.base import LLMBackend
 from shelf.summarize.exceptions import ContextWindowExceededError
@@ -43,43 +46,76 @@ def generate_book_summary(
 
     # Collect all H2 sections across chapters for progress counting
     total_sections = sum(len(ch.children) for ch in chapters)
-    section_idx = 0
+    progress_counter = 0
+    progress_lock = threading.Lock()
 
-    # --- Phase 1: section summaries ---
-    chapter_section_summaries: dict[str, list[SectionSummary]] = {}
+    # --- Phase 1: section summaries (parallel) ---
+    # Build a flat list of (chapter_title, section_index, section) to submit
+    tasks: list[tuple[str, int, Section]] = []
     for chapter in chapters:
-        section_sums: list[SectionSummary] = []
-        for section in chapter.children:
-            section_idx += 1
-            _log(f"Section {section_idx}/{total_sections}: {section.title}")
-            ss = _summarize_section(
-                section, chapter.title, backend, max_chars
-            )
-            section_sums.append(ss)
-        chapter_section_summaries[chapter.title] = section_sums
+        for sec_idx, section in enumerate(chapter.children):
+            tasks.append((chapter.title, sec_idx, section))
 
-    # --- Phase 2: chapter rollups ---
-    chapter_summaries: list[ChapterSummary] = []
-    for ch_idx, chapter in enumerate(chapters, start=1):
-        _log(f"Chapter {ch_idx}/{len(chapters)}: {chapter.title}")
-        sec_sums = chapter_section_summaries[chapter.title]
-        cs = _rollup_chapter(chapter.title, sec_sums, backend)
-        chapter_summaries.append(cs)
+    # Pre-allocate ordered lists per chapter
+    chapter_section_summaries: dict[str, list[SectionSummary | None]] = {
+        ch.title: [None] * len(ch.children) for ch in chapters
+    }
+
+    with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
+        future_to_task = {
+            pool.submit(
+                _summarize_section, section, ch_title, backend, max_chars
+            ): (ch_title, sec_idx, section.title)
+            for ch_title, sec_idx, section in tasks
+        }
+        for fut in as_completed(future_to_task):
+            ch_title, sec_idx, sec_title = future_to_task[fut]
+            ss = fut.result()
+            chapter_section_summaries[ch_title][sec_idx] = ss
+            with progress_lock:
+                progress_counter += 1
+                _log(f"Section {progress_counter}/{total_sections}: {sec_title}")
+
+    # Cast away the None placeholders (all filled by now)
+    filled_summaries: dict[str, list[SectionSummary]] = {
+        k: list(v) for k, v in chapter_section_summaries.items()  # type: ignore[arg-type]
+    }
+
+    # --- Phase 2: chapter rollups (parallel) ---
+    chapter_summaries: list[ChapterSummary | None] = [None] * len(chapters)
+
+    with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
+        future_to_idx = {
+            pool.submit(
+                _rollup_chapter,
+                ch.title,
+                filled_summaries[ch.title],
+                backend,
+            ): idx
+            for idx, ch in enumerate(chapters)
+        }
+        for fut in as_completed(future_to_idx):
+            idx = future_to_idx[fut]
+            _log(f"Chapter {idx + 1}/{len(chapters)}: {chapters[idx].title}")
+            chapter_summaries[idx] = fut.result()
+
+    # All slots filled — narrow the type
+    completed_chapters: list[ChapterSummary] = list(chapter_summaries)  # type: ignore[arg-type]
 
     # --- Phase 3: book rollup ---
     _log("Generating book overview...")
-    overview = _rollup_book(chapter_summaries, backend)
+    overview = _rollup_book(completed_chapters, backend)
 
     all_entities = _dedup_entities(
-        [e for cs in chapter_summaries for e in cs.entities]
+        [e for cs in completed_chapters for e in cs.entities]
     )
     all_relationships = _dedup_relationships(
-        [r for cs in chapter_summaries for r in cs.relationships]
+        [r for cs in completed_chapters for r in cs.relationships]
     )
 
     return BookSummary(
         overview=overview,
-        chapter_summaries=chapter_summaries,
+        chapter_summaries=completed_chapters,
         all_entities=all_entities,
         all_relationships=all_relationships,
     )

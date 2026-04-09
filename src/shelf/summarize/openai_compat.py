@@ -1,17 +1,14 @@
-"""OpenAI-compatible API backend using environment variables."""
+"""OpenAI-compatible API backend using centralized config."""
 
-import os
-
+from shelf.config import SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, SHELF_LLM_MODEL
 from shelf.summarize.exceptions import ContextWindowExceededError
 
 
 class OpenAICompatBackend:
     def __init__(self):
-        self.api_key = os.environ["SHELF_LLM_API_KEY"]
-        self.base_url = os.environ.get(
-            "SHELF_LLM_BASE_URL", "https://api.openai.com/v1"
-        )
-        self.model = os.environ.get("SHELF_LLM_MODEL", "gpt-4o-mini")
+        self.api_key = SHELF_LLM_API_KEY
+        self.base_url = SHELF_LLM_BASE_URL
+        self.model = SHELF_LLM_MODEL
 
     def summarize(self, text: str, prompt: str) -> str:
         import httpx
