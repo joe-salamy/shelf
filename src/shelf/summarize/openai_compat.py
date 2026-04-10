@@ -1,9 +1,12 @@
 """OpenAI-compatible API backend using centralized config."""
 
+from __future__ import annotations
+
 import logging
 import time
 
 from shelf.config import SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, SHELF_LLM_MODEL
+from shelf.summarize.base import LLMResult
 from shelf.summarize.exceptions import ContextWindowExceededError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +21,7 @@ class OpenAICompatBackend:
         self.base_url = SHELF_LLM_BASE_URL
         self.model = SHELF_LLM_MODEL
 
-    def summarize(self, text: str, prompt: str) -> str:
+    def summarize(self, text: str, prompt: str) -> LLMResult:
         import httpx
 
         headers = {
@@ -64,6 +67,19 @@ class OpenAICompatBackend:
                     except (ValueError, KeyError):
                         pass
                 raise
-            return resp.json()["choices"][0]["message"]["content"].strip()
+
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            choice = data["choices"][0]
+            metadata = {
+                "provider": "openai_compat",
+                "request": {"model": self.model, "temperature": 0},
+                "response_id": data.get("id"),
+                "response_model": data.get("model"),
+                "created": data.get("created"),
+                "finish_reason": choice.get("finish_reason"),
+                "usage": data.get("usage"),
+            }
+            return LLMResult(text=content, metadata=metadata)
 
         raise last_exc  # type: ignore[misc]

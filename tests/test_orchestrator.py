@@ -4,6 +4,7 @@ import json
 import pytest
 from pathlib import Path
 from shelf.models import BookTree, Section
+from shelf.summarize.base import LLMResult
 from shelf.summarize.models import BookSummary, ChapterSummary, SectionSummary
 from shelf.summarize.orchestrator import (
     generate_book_summary,
@@ -24,12 +25,12 @@ class MockBackend:
     def __init__(self):
         self.call_count = 0
 
-    def summarize(self, text: str, prompt: str) -> str:
+    def summarize(self, text: str, prompt: str) -> LLMResult:
         self.call_count += 1
         # Detect which prompt type by unique keywords in the prompt
         if "prerequisites" in prompt:
             # Section prompt
-            return json.dumps(
+            return LLMResult(text=json.dumps(
                 {
                     "summary": "This section covers important concepts.",
                     "key_points": ["Point A", "Point B"],
@@ -50,31 +51,31 @@ class MockBackend:
                     "prerequisites": ["Constitutional basics"],
                     "leads_to": ["Equal Protection"],
                 }
-            )
+            ))
         elif "entire textbook" in prompt.lower():
             # Book rollup prompt
-            return json.dumps(
+            return LLMResult(text=json.dumps(
                 {"overview": "This textbook covers constitutional law fundamentals."}
-            )
+            ))
         else:
             # Chapter rollup prompt
-            return json.dumps(
+            return LLMResult(text=json.dumps(
                 {"summary": "This chapter provides a comprehensive overview."}
-            )
+            ))
 
 
 class FailingBackend:
     """Raises on every call."""
 
-    def summarize(self, text: str, prompt: str) -> str:
+    def summarize(self, text: str, prompt: str) -> LLMResult:
         raise ConnectionError("LLM unreachable")
 
 
 class BadJsonBackend:
     """Returns invalid JSON."""
 
-    def summarize(self, text: str, prompt: str) -> str:
-        return "This is not JSON at all, sorry!"
+    def summarize(self, text: str, prompt: str) -> LLMResult:
+        return LLMResult(text="This is not JSON at all, sorry!")
 
 
 # ---------------------------------------------------------------------------

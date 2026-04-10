@@ -194,7 +194,7 @@ def _call_section_llm(
 ) -> SectionSummary:
     """Make one LLM call for a section (or chunk) and parse the result."""
     try:
-        raw = backend.summarize(content, SECTION_PROMPT)
+        raw = backend.summarize(content, SECTION_PROMPT).text
     except ContextWindowExceededError:
         raise
     except Exception as exc:
@@ -321,7 +321,7 @@ def _rollup_chapter(
 
     summary = chapter_title  # fallback
     try:
-        raw = backend.summarize(input_text, CHAPTER_ROLLUP_PROMPT)
+        raw = backend.summarize(input_text, CHAPTER_ROLLUP_PROMPT).text
         json_match = re.search(r"\{.*\}", raw, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())
@@ -365,7 +365,7 @@ def _rollup_book(
     input_text = "\n".join(lines)
 
     try:
-        raw = backend.summarize(input_text, BOOK_ROLLUP_PROMPT)
+        raw = backend.summarize(input_text, BOOK_ROLLUP_PROMPT).text
         json_match = re.search(r"\{.*\}", raw, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())

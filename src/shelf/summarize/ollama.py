@@ -1,6 +1,9 @@
 """Ollama local LLM backend."""
 
+from __future__ import annotations
+
 from shelf.config import SHELF_OLLAMA_MODEL, SHELF_OLLAMA_URL
+from shelf.summarize.base import LLMResult
 from shelf.summarize.exceptions import ContextWindowExceededError
 
 
@@ -19,7 +22,7 @@ class OllamaBackend:
         except Exception:
             return False
 
-    def summarize(self, text: str, prompt: str) -> str:
+    def summarize(self, text: str, prompt: str) -> LLMResult:
         import httpx
 
         payload = {
@@ -50,4 +53,18 @@ class OllamaBackend:
             err_msg = str(data["error"])
             if "context" in err_msg.lower():
                 raise ContextWindowExceededError(self.model, detail=err_msg)
-        return data["response"].strip()
+
+        content = data["response"].strip()
+        metadata = {
+            "provider": "ollama",
+            "request": {"model": self.model},
+            "response_model": data.get("model"),
+            "created_at": data.get("created_at"),
+            "total_duration": data.get("total_duration"),
+            "load_duration": data.get("load_duration"),
+            "prompt_eval_count": data.get("prompt_eval_count"),
+            "prompt_eval_duration": data.get("prompt_eval_duration"),
+            "eval_count": data.get("eval_count"),
+            "eval_duration": data.get("eval_duration"),
+        }
+        return LLMResult(text=content, metadata=metadata)

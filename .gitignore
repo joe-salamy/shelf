@@ -13,3 +13,4 @@ docs/
 /shelf/
 .env
 textbook-tests/
+logs/
