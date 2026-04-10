@@ -1,3 +1,7 @@
+## Overview
+
+Shelf is a CLI tool that converts PDF and EPUB textbooks into nested, grep-friendly Markdown directories split by heading depth. It also supports LLM-powered section summarization via OpenAI-compatible or Ollama backends.
+
 ## Environment
 
 - Activate venv before any pip/python commands: `venv\Scripts\Activate.ps1`
@@ -9,11 +13,13 @@
 
 ## Off-Limits Files
 
-- Never read from, write to, or git diff `scratchpad.md`.
+- Never read from, write to, or git diff `docs/scratchpad.md`.
 - When running `/code-reviewer` or `/python-pro`, exclude diffs of files in `.claude/` and `docs/` — these are settings/prose, not reviewable code.
 
 ## Plan Mode
 
-- Be liberal with asking questions; when in doubt, ask more rather than fewer.
+- When asking clarifying questions in plan mode, be liberal; when in doubt, ask more rather than fewer.
 
-Reference textbooks are in ./shelf\Intro to Statistical Thermodynamics - Molecular Perspective (Elstner, Cui, Gruden)/
+## Documentation
+
+- Keep READMEs concise.
