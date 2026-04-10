@@ -63,6 +63,7 @@ def estimate_cost(
     tree: BookTree,
     max_chars: int = 24_000,
     section_limit: int | None = None,
+    section_offset: int = 0,
 ) -> CostEstimate:
     """Estimate token usage and cost for all 3 pipeline phases."""
 
@@ -79,6 +80,8 @@ def estimate_cost(
         for section in chapter.children:
             tasks.append((chapter.title, section))
 
+    if section_offset:
+        tasks = tasks[section_offset:]
     if section_limit is not None:
         tasks = tasks[:section_limit]
 

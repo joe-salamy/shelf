@@ -36,6 +36,7 @@ def generate_book_summary(
     max_chars: int = 24_000,
     on_progress: Callable[[str], None] | None = None,
     section_limit: int | None = None,
+    section_offset: int = 0,
 ) -> BookSummary:
     """Run the full bottom-up summarization pipeline."""
 
@@ -57,6 +58,8 @@ def generate_book_summary(
         for sec_idx, section in enumerate(chapter.children):
             tasks.append((chapter.title, sec_idx, section))
 
+    if section_offset:
+        tasks = tasks[section_offset:]
     if section_limit is not None:
         tasks = tasks[:section_limit]
         total_sections = len(tasks)

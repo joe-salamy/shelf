@@ -66,6 +66,13 @@ from shelf.output import write_shelf
     help="Test mode: only summarize the first 5 sections (implies --summarize)",
 )
 @click.option(
+    "--offset",
+    default=0,
+    type=int,
+    show_default=True,
+    help="Skip the first N sections before summarizing (useful with --test to skip intro material)",
+)
+@click.option(
     "--yes",
     "-y",
     is_flag=True,
@@ -81,6 +88,7 @@ def main(
     max_section_chars: int,
     enable_log: bool,
     test: bool,
+    offset: int,
     yes: bool,
 ):
     """Convert a PDF or EPUB textbook into a nested markdown directory.
@@ -103,7 +111,10 @@ def main(
 
     if test:
         summarize = True
-        click.echo("Test mode: limiting to first 5 section summaries")
+        msg = "Test mode: limiting to 5 section summaries"
+        if offset:
+            msg += f" (skipping first {offset} sections)"
+        click.echo(msg)
 
     book_summary = None
     if summarize:
@@ -123,7 +134,7 @@ def main(
             from shelf.summarize.estimate import estimate_cost
 
             section_lim = 5 if test else None
-            est = estimate_cost(tree, max_chars=max_section_chars, section_limit=section_lim)
+            est = estimate_cost(tree, max_chars=max_section_chars, section_limit=section_lim, section_offset=offset)
 
             click.echo("\nEstimated LLM usage:")
             click.echo(
@@ -168,6 +179,7 @@ def main(
                 max_chars=max_section_chars,
                 on_progress=lambda msg: click.echo(f"  {msg}"),
                 section_limit=5 if test else None,
+                section_offset=offset,
             )
         except ContextWindowExceededError as e:
             raise click.ClickException(
