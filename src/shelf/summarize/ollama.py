@@ -29,6 +29,7 @@ class OllamaBackend:
             "model": self.model,
             "prompt": f"{prompt}\n\n{text}",
             "stream": False,
+            "format": "json",
         }
         resp = httpx.post(
             f"{self.base_url}/api/generate",
