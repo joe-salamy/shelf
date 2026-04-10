@@ -23,3 +23,5 @@ Shelf is a CLI tool that converts PDF and EPUB textbooks into nested, grep-frien
 ## Documentation
 
 - Keep READMEs concise.
+
+Reference textbooks are in ./shelf\Intro to Statistical Thermodynamics - Molecular Perspective (Elstner, Cui, Gruden)/

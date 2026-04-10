@@ -134,7 +134,12 @@ def main(
             from shelf.summarize.estimate import estimate_cost
 
             section_lim = 5 if test else None
-            est = estimate_cost(tree, max_chars=max_section_chars, section_limit=section_lim, section_offset=offset)
+            est = estimate_cost(
+                tree,
+                max_chars=max_section_chars,
+                section_limit=section_lim,
+                section_offset=offset,
+            )
 
             click.echo("\nEstimated LLM usage:")
             click.echo(
@@ -202,9 +207,15 @@ def main(
     except ValueError:
         rel_out = output_dir
 
-    click.echo(
-        f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
-    )
+    if test:
+        summarized = min(5, section_count)
+        click.echo(
+            f"Done! Summarized {summarized} of {section_count} sections (test mode) across {chapter_count} chapters -> {rel_out}/"
+        )
+    else:
+        click.echo(
+            f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
+        )
     click.echo(f"Generated {rel_out}/{index_filename}")
 
     if book_summary:

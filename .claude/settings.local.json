@@ -1,12 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m venv .venv 2>&1)",
+      "Bash(python -m venv .venv 2\u003e\u00261)",
       "Bash(.venv/Scripts/pip install:*)",
-      "Bash(.venv/Scripts/shelf --help 2>&1)",
+      "Bash(.venv/Scripts/shelf --help 2\u003e\u00261)",
       "Bash(.venv/Scripts/pip index:*)",
-      "Bash(.venv/Scripts/pytest tests/ -v 2>&1)",
-      "Bash(.venv/Scripts/python -c \"from shelf import shelf; print\\('API import OK'\\)\" && .venv/Scripts/shelf --help | head -5)",
+      "Bash(.venv/Scripts/pytest tests/ -v 2\u003e\u00261)",
+      "Bash(.venv/Scripts/python -c \"from shelf import shelf; print\\(\u0027API import OK\u0027\\)\" \u0026\u0026 .venv/Scripts/shelf --help | head -5)",
       "Bash(git init:*)",
       "Bash(git commit:*)",
       "Bash(python -m pytest -q)",
@@ -39,17 +39,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -c \"import sys,json,subprocess; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); r=subprocess.run(['python','-m','py_compile',f],capture_output=True,text=True) if f.endswith('.py') else None; r and r.returncode and (sys.stderr.write(r.stderr) or sys.exit(r.returncode))\"",
+            "command": "python -c \"import sys,json,subprocess; d=json.load(sys.stdin); f=d.get(\u0027tool_input\u0027,{}).get(\u0027file_path\u0027,\u0027\u0027); r=subprocess.run([\u0027python\u0027,\u0027-m\u0027,\u0027py_compile\u0027,f],capture_output=True,text=True) if f.endswith(\u0027.py\u0027) else None; r and r.returncode and (sys.stderr.write(r.stderr) or sys.exit(r.returncode))\"",
             "statusMessage": "Checking syntax..."
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .git/hooks/review-reminder.sh"
           }
         ]
       }

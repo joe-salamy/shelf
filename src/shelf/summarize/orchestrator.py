@@ -207,11 +207,25 @@ def _call_section_llm(
     return _parse_section_response(raw, section_title, chapter_title)
 
 
-_EXPECTED_SECTION_KEYS = {"summary", "key_points", "entities", "relationships",
-                          "prerequisites", "leads_to"}
+_EXPECTED_SECTION_KEYS = {
+    "summary",
+    "key_points",
+    "entities",
+    "relationships",
+    "prerequisites",
+    "leads_to",
+}
 _VALID_KINDS = {"term", "case", "person", "statute", "concept"}
-_VALID_RELATIONS = {"PART-OF", "DEFINES", "CITED-IN", "APPLIES-IN",
-                    "OVERRULES", "ESTABLISHES", "PREREQUISITE-FOR", "RELATED-TO"}
+_VALID_RELATIONS = {
+    "PART-OF",
+    "DEFINES",
+    "CITED-IN",
+    "APPLIES-IN",
+    "OVERRULES",
+    "ESTABLISHES",
+    "PREREQUISITE-FOR",
+    "RELATED-TO",
+}
 
 
 def _parse_section_response(
@@ -220,8 +234,7 @@ def _parse_section_response(
     """Parse LLM JSON response into a SectionSummary."""
     json_match = re.search(r"\{.*\}", raw, re.DOTALL)
     if not json_match:
-        logger.warning("No JSON found in LLM response for section '%s'",
-                        section_title)
+        logger.warning("No JSON found in LLM response for section '%s'", section_title)
         return SectionSummary(
             section_title=section_title,
             chapter_title=chapter_title,
@@ -231,8 +244,7 @@ def _parse_section_response(
     try:
         data = json.loads(json_match.group())
     except json.JSONDecodeError:
-        logger.warning("Invalid JSON in LLM response for section '%s'",
-                        section_title)
+        logger.warning("Invalid JSON in LLM response for section '%s'", section_title)
         return SectionSummary(
             section_title=section_title,
             chapter_title=chapter_title,
@@ -241,42 +253,60 @@ def _parse_section_response(
 
     missing_keys = _EXPECTED_SECTION_KEYS - data.keys()
     if missing_keys:
-        logger.warning("Section '%s': missing keys in LLM response: %s",
-                        section_title, ", ".join(sorted(missing_keys)))
+        logger.warning(
+            "Section '%s': missing keys in LLM response: %s",
+            section_title,
+            ", ".join(sorted(missing_keys)),
+        )
 
     raw_entities = data.get("entities", [])
     entities = []
     for e in raw_entities:
         if not isinstance(e, dict) or not e.get("name"):
-            logger.warning("Section '%s': dropped malformed entity: %s",
-                            section_title, e)
+            logger.warning(
+                "Section '%s': dropped malformed entity: %s", section_title, e
+            )
             continue
         kind = e.get("kind", "concept")
         if kind not in _VALID_KINDS:
-            logger.warning("Section '%s': unexpected entity kind '%s' for '%s'",
-                            section_title, kind, e.get("name"))
-        entities.append(Entity(
-            name=e.get("name", ""),
-            kind=kind,
-            definition=e.get("definition", ""),
-        ))
+            logger.warning(
+                "Section '%s': unexpected entity kind '%s' for '%s'",
+                section_title,
+                kind,
+                e.get("name"),
+            )
+        entities.append(
+            Entity(
+                name=e.get("name", ""),
+                kind=kind,
+                definition=e.get("definition", ""),
+            )
+        )
 
     raw_rels = data.get("relationships", [])
     relationships = []
     for r in raw_rels:
         if not isinstance(r, dict) or not r.get("source") or not r.get("target"):
-            logger.warning("Section '%s': dropped malformed relationship: %s",
-                            section_title, r)
+            logger.warning(
+                "Section '%s': dropped malformed relationship: %s", section_title, r
+            )
             continue
         relation = r.get("relation", "")
         if relation not in _VALID_RELATIONS:
-            logger.warning("Section '%s': unexpected relation '%s' (%s -> %s)",
-                            section_title, relation, r.get("source"), r.get("target"))
-        relationships.append(Relationship(
-            source=r.get("source", ""),
-            relation=relation,
-            target=r.get("target", ""),
-        ))
+            logger.warning(
+                "Section '%s': unexpected relation '%s' (%s -> %s)",
+                section_title,
+                relation,
+                r.get("source"),
+                r.get("target"),
+            )
+        relationships.append(
+            Relationship(
+                source=r.get("source", ""),
+                relation=relation,
+                target=r.get("target", ""),
+            )
+        )
 
     return SectionSummary(
         section_title=section_title,
@@ -360,8 +390,10 @@ def _rollup_chapter(
         if json_match:
             data = json.loads(json_match.group())
             if "summary" not in data:
-                logger.warning("Chapter '%s': missing 'summary' key in rollup response",
-                                chapter_title)
+                logger.warning(
+                    "Chapter '%s': missing 'summary' key in rollup response",
+                    chapter_title,
+                )
             summary = data.get("summary", raw.strip())
         else:
             logger.warning("No JSON found in chapter rollup for '%s'", chapter_title)
