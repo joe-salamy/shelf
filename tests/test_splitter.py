@@ -10,7 +10,9 @@ def test_content_under_limit_returns_single_chunk():
 
 
 def test_splits_at_h3_heading():
-    content = "Intro paragraph.\n\n### Section A\n\nContent A.\n\n### Section B\n\nContent B."
+    content = (
+        "Intro paragraph.\n\n### Section A\n\nContent A.\n\n### Section B\n\nContent B."
+    )
     result = split_section_content(content, max_chars=30)
     assert len(result) >= 2
     # All original content should be present across chunks

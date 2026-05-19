@@ -1,7 +1,6 @@
 """Tests for shelf.models."""
 
-import pytest
-from shelf.models import Section, BookTree
+from shelf.models import BookTree, Section
 
 
 def _make_tree():

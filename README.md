@@ -144,3 +144,7 @@ shelf textbook.pdf --summarize
 2. **Split** — Parse ATX headers, build nested `Section` tree up to `--depth`
 3. **Output** — Write numbered directories, section files, `INDEX.md`, and `CLAUDE.md`
 4. **Summarize** _(optional)_ — Walk the tree, call LLM, prepend summaries
+
+## License
+
+MIT

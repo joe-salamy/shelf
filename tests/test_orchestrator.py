@@ -1,18 +1,20 @@
 """Tests for shelf.summarize.orchestrator."""
 
 import json
-import pytest
 from pathlib import Path
+
 from shelf.models import BookTree, Section
 from shelf.summarize.base import LLMResult
-from shelf.summarize.models import BookSummary, ChapterSummary, SectionSummary
+from shelf.summarize.models import (
+    BookSummary,
+    Entity,
+    Relationship,
+)
 from shelf.summarize.orchestrator import (
-    generate_book_summary,
     _dedup_entities,
     _dedup_relationships,
+    generate_book_summary,
 )
-from shelf.summarize.models import Entity, Relationship
-
 
 # ---------------------------------------------------------------------------
 # Mock backend
@@ -30,38 +32,50 @@ class MockBackend:
         # Detect which prompt type by unique keywords in the prompt
         if "prerequisites" in prompt:
             # Section prompt
-            return LLMResult(text=json.dumps(
-                {
-                    "summary": "This section covers important concepts.",
-                    "key_points": ["Point A", "Point B"],
-                    "entities": [
-                        {
-                            "name": "Due Process",
-                            "kind": "term",
-                            "definition": "Constitutional guarantee of fair procedures.",
-                        }
-                    ],
-                    "relationships": [
-                        {
-                            "source": "Due Process",
-                            "relation": "PART-OF",
-                            "target": "Fourteenth Amendment",
-                        }
-                    ],
-                    "prerequisites": ["Constitutional basics"],
-                    "leads_to": ["Equal Protection"],
-                }
-            ))
+            return LLMResult(
+                text=json.dumps(
+                    {
+                        "summary": "This section covers important concepts.",
+                        "key_points": ["Point A", "Point B"],
+                        "entities": [
+                            {
+                                "name": "Due Process",
+                                "kind": "term",
+                                "definition": (
+                                    "Constitutional guarantee of fair procedures."
+                                ),
+                            }
+                        ],
+                        "relationships": [
+                            {
+                                "source": "Due Process",
+                                "relation": "PART-OF",
+                                "target": "Fourteenth Amendment",
+                            }
+                        ],
+                        "prerequisites": ["Constitutional basics"],
+                        "leads_to": ["Equal Protection"],
+                    }
+                )
+            )
         elif "entire textbook" in prompt.lower():
             # Book rollup prompt
-            return LLMResult(text=json.dumps(
-                {"overview": "This textbook covers constitutional law fundamentals."}
-            ))
+            return LLMResult(
+                text=json.dumps(
+                    {
+                        "overview": (
+                            "This textbook covers constitutional law fundamentals."
+                        )
+                    }
+                )
+            )
         else:
             # Chapter rollup prompt
-            return LLMResult(text=json.dumps(
-                {"summary": "This chapter provides a comprehensive overview."}
-            ))
+            return LLMResult(
+                text=json.dumps(
+                    {"summary": "This chapter provides a comprehensive overview."}
+                )
+            )
 
 
 class FailingBackend:

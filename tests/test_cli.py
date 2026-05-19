@@ -1,12 +1,12 @@
 """Integration tests for the shelf CLI using Click's CliRunner."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from click.testing import CliRunner
+
 from shelf.cli import main
 from shelf.models import BookTree, Section
-
 
 FAKE_MARKDOWN = """\
 # Constitutional Law
@@ -124,7 +124,7 @@ def test_shelf_default_output_dir(tmp_path):
         patch("shelf.cli.split_markdown", return_value=fake_tree),
         patch("shelf.cli.write_shelf", side_effect=capture_write),
     ):
-        result = runner.invoke(main, [str(pdf)])
+        runner.invoke(main, [str(pdf)])
 
     assert "output_dir" in captured_args
     assert captured_args["output_dir"].name == "my-textbook"
@@ -153,7 +153,8 @@ def test_shelf_summarize_flag(tmp_path):
         ),
     ):
         result = runner.invoke(
-            main, [str(pdf), "--output", str(tmp_path / "out"), "--summarize"]
+            main,
+            [str(pdf), "--output", str(tmp_path / "out"), "--summarize", "--yes"],
         )
 
     assert result.exit_code == 0, result.output

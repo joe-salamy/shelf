@@ -97,7 +97,9 @@ def estimate_cost(
             content_words = _word_count(chunk)
             p1_input_tokens += _words_to_tokens(content_words + prompt_words["section"])
             p1_calls += 1
-        chapter_task_counts[ch_title] = chapter_task_counts.get(ch_title, 0) + len(chunks)
+        chapter_task_counts[ch_title] = chapter_task_counts.get(ch_title, 0) + len(
+            chunks
+        )
 
     p1_output_tokens = int(p1_input_tokens * SHELF_OUTPUT_TOKEN_RATIO)
 

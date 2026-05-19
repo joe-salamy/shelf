@@ -7,6 +7,4 @@ class ContextWindowExceededError(Exception):
     def __init__(self, model: str, detail: str = ""):
         self.model = model
         self.detail = detail
-        super().__init__(
-            f"Context window exceeded for model '{model}'. {detail}"
-        )
+        super().__init__(f"Context window exceeded for model '{model}'. {detail}")

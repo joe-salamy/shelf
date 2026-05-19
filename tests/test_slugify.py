@@ -1,6 +1,5 @@
 """Tests for shelf.slugify."""
 
-import pytest
 from shelf.slugify import slugify
 
 

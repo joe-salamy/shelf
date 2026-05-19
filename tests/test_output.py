@@ -1,7 +1,7 @@
 """Tests for shelf.output."""
 
-import pytest
 from pathlib import Path
+
 from shelf.models import BookTree, Section
 from shelf.output import write_shelf
 from shelf.summarize.models import (

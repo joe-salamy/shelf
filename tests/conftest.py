@@ -1,8 +1,8 @@
 """Shared pytest fixtures."""
 
-import pytest
 from pathlib import Path
 
+import pytest
 
 SIMPLE_MARKDOWN = """\
 # Chapter One

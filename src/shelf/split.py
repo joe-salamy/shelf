@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from shelf.models import BookTree, Section
 
-
 _HEADER_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 
 

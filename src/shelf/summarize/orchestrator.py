@@ -78,9 +78,9 @@ def generate_book_summary(
             )
             for ch_title, sec_idx, section in tasks
         }
-        for fut in as_completed(future_to_task):
-            ch_title, sec_idx, sec_title = future_to_task[fut]
-            ss = fut.result()
+        for section_future in as_completed(future_to_task):
+            ch_title, sec_idx, sec_title = future_to_task[section_future]
+            ss = section_future.result()
             chapter_section_summaries[ch_title][sec_idx] = ss
             with progress_lock:
                 progress_counter += 1
@@ -119,15 +119,15 @@ def generate_book_summary(
             ): idx
             for idx, ch in enumerate(rollup_chapters)
         }
-        for fut in as_completed(future_to_idx):
-            idx = future_to_idx[fut]
+        for chapter_future in as_completed(future_to_idx):
+            idx = future_to_idx[chapter_future]
             _log(
                 f"Chapter {idx + 1}/{len(rollup_chapters)}: {rollup_chapters[idx].title}"
             )
-            chapter_summaries[idx] = fut.result()
+            chapter_summaries[idx] = chapter_future.result()
 
     # All slots filled — narrow the type
-    completed_chapters: list[ChapterSummary] = list(chapter_summaries)  # type: ignore[arg-type]
+    completed_chapters = [cs for cs in chapter_summaries if cs is not None]
 
     # --- Phase 3: book rollup ---
     _log("Generating book overview...")
@@ -441,7 +441,7 @@ def _rollup_book(
             data = json.loads(json_match.group())
             if "overview" not in data:
                 logger.warning("Book rollup: missing 'overview' key in response")
-            return data.get("overview", raw.strip())
+            return str(data.get("overview", raw.strip()))
         logger.warning("No JSON found in book rollup response")
         return raw.strip()
     except ContextWindowExceededError:

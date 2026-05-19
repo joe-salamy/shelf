@@ -8,7 +8,7 @@ from shelf.summarize.exceptions import ContextWindowExceededError
 
 
 class OllamaBackend:
-    def __init__(self):
+    def __init__(self) -> None:
         self.base_url = SHELF_OLLAMA_URL
         self.model = SHELF_OLLAMA_MODEL
 

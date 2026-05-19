@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import time
 
+from typing import cast
+
 from shelf.config import SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, SHELF_LLM_MODEL
 from shelf.summarize.base import LLMResult
 from shelf.summarize.exceptions import ContextWindowExceededError
@@ -16,7 +18,7 @@ INITIAL_BACKOFF = 2.0  # seconds
 
 
 class OpenAICompatBackend:
-    def __init__(self):
+    def __init__(self) -> None:
         self.api_key = SHELF_LLM_API_KEY
         self.base_url = SHELF_LLM_BASE_URL
         self.model = SHELF_LLM_MODEL
@@ -51,7 +53,7 @@ class OpenAICompatBackend:
             except httpx.HTTPStatusError as exc:
                 if resp.status_code == 429:
                     last_exc = exc
-                    wait = INITIAL_BACKOFF * (2 ** attempt)
+                    wait = INITIAL_BACKOFF * (2**attempt)
                     logger.info("Rate limited (429), retrying in %.1fs...", wait)
                     time.sleep(wait)
                     continue
@@ -70,7 +72,7 @@ class OpenAICompatBackend:
                 raise
 
             data = resp.json()
-            content = data["choices"][0]["message"]["content"].strip()
+            content = cast(str, data["choices"][0]["message"]["content"].strip())
             choice = data["choices"][0]
             metadata = {
                 "provider": "openai_compat",

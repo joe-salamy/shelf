@@ -1,9 +1,6 @@
 """Tests for shelf.split — the most critical layer."""
 
-import pytest
 from shelf.split import split_markdown
-from shelf.models import BookTree, Section
-
 
 # --- Basic structure ---
 
@@ -144,7 +141,11 @@ def test_title_falls_back_to_untitled():
 
 
 def test_content_between_chapters():
-    md = "# Chapter One\n\nChapter one intro.\n\n## Sec 1\n\nSec content.\n\n# Chapter Two\n\nChapter two intro.\n"
+    md = (
+        "# Chapter One\n\nChapter one intro.\n\n"
+        "## Sec 1\n\nSec content.\n\n"
+        "# Chapter Two\n\nChapter two intro.\n"
+    )
     tree = split_markdown(md)
     chapters = [s for s in tree.sections if s.title != "Front Matter"]
     assert "Chapter one intro" in chapters[0].content

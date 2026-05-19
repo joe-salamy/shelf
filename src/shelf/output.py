@@ -81,10 +81,10 @@ def write_shelf(
             sec_file.write_text(sec_content, encoding="utf-8")
 
         # Chapter-level CLAUDE.md and CONCEPTS.md (if summarized)
-        cs = ch_summary_map.get(chapter.title)
-        if cs:
-            _write_chapter_index(ch_dir, cs, index_filename)
-            _write_chapter_concepts(ch_dir, cs)
+        chapter_summary = ch_summary_map.get(chapter.title)
+        if chapter_summary:
+            _write_chapter_index(ch_dir, chapter_summary, index_filename)
+            _write_chapter_concepts(ch_dir, chapter_summary)
 
     # Write front matter to output root if present
     if front_matter:

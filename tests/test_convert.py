@@ -1,8 +1,9 @@
 """Tests for shelf.convert."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+
 from shelf.convert import convert
 
 

@@ -1,7 +1,9 @@
 """Tests for shelf.summarize — get_backend selection logic."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from shelf.summarize import get_backend
 
 
@@ -9,7 +11,7 @@ def test_get_backend_uses_api_key_when_set(monkeypatch):
     monkeypatch.setattr("shelf.summarize.SHELF_LLM_API_KEY", "test-key")
     with patch("shelf.summarize.openai_compat.OpenAICompatBackend") as mock_cls:
         mock_cls.return_value = MagicMock()
-        backend = get_backend()
+        get_backend()
     mock_cls.assert_called_once()
 
 

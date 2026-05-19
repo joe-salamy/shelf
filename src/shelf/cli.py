@@ -90,7 +90,7 @@ def main(
     test: bool,
     offset: int,
     yes: bool,
-):
+) -> None:
     """Convert a PDF or EPUB textbook into a nested markdown directory.
 
     INPUT_PATH is the path to the PDF or EPUB file to convert.
@@ -191,6 +191,8 @@ def main(
                 f"Context window exceeded: {e}\n"
                 "Try reducing --max-section-chars or using a model with a larger context window."
             )
+        except click.Abort:
+            raise
         except click.ClickException:
             raise
         except Exception as e:
