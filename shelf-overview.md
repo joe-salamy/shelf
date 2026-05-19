@@ -205,7 +205,7 @@ This file lives at `shelf/constitutional-law/AGENTS.md`. Ten textbooks means ten
 
 ### Discovery
 
-After conversion, Shelf prints a one-liner the user can paste into their root AGENTS.md:
+After conversion, Shelf appends a compact textbook-specific section to the user's root AGENTS.md:
 
 ```
 $ shelf constitutional-law.pdf
@@ -213,12 +213,10 @@ $ shelf constitutional-law.pdf
 ✓ Wrote 42 sections across 8 chapters → shelf/constitutional-law/
 ✓ Generated shelf/constitutional-law/AGENTS.md
 
-Add this to your root AGENTS.md to make this book discoverable:
-
-  Reference textbooks are in ./shelf/constitutional-law/
+Added textbook pointer to C:\path\to\project\AGENTS.md
 ```
 
-Non-invasive. Shelf only appends to your project's root AGENTS.md when that file already exists and the output is under the current working directory; otherwise, it tells you what to add.
+The appended root section includes the textbook path, generated navigation guide, source file, and chapter/section counts. Shelf creates the project's root AGENTS.md when needed and appends the section when the output is under the current working directory. It does not duplicate the shared Shelf file guide for every textbook. If the output is outside the project or the file cannot be updated, Shelf prints the section to add manually.
 
 ### An Agent Navigation Session
 

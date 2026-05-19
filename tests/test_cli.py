@@ -96,6 +96,104 @@ def test_shelf_prints_success_message(tmp_path):
     assert "AGENTS.md" in result.output
 
 
+def test_shelf_auto_appends_root_agents_textbook_section(tmp_path):
+    fake_tree = _make_fake_tree()
+    runner = CliRunner()
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pdf = Path("test.pdf")
+        pdf.write_bytes(b"%PDF-1.4 fake")
+        Path("AGENTS.md").write_text("# Project\n", encoding="utf-8")
+
+        def capture_write(
+            tree, output_dir, book_summary=None, index_filename="AGENTS.md"
+        ):
+            output_dir.mkdir(parents=True)
+
+        with (
+            patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+            patch("shelf.cli.split_markdown", return_value=fake_tree),
+            patch("shelf.cli.write_shelf", side_effect=capture_write),
+        ):
+            result = runner.invoke(main, [str(pdf), "--output", "shelf/con-law"])
+
+        assert result.exit_code == 0
+        assert "Added textbook pointer" in result.output
+        content = Path("AGENTS.md").read_text(encoding="utf-8")
+        assert "## Shelf Textbook: Constitutional Law" in content
+        assert f"- Textbook path: `./{Path('shelf/con-law').as_posix()}/`" in content
+        assert "- Navigation guide: `./shelf/con-law/AGENTS.md`" in content
+        assert "- Source file: `test.pdf`" in content
+        assert "- Scope: 1 chapters, 2 sections" in content
+        assert "## File guide" not in content
+        assert "`INDEX.md`" not in content
+
+
+def test_shelf_creates_root_agents_when_missing(tmp_path):
+    fake_tree = _make_fake_tree()
+    runner = CliRunner()
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pdf = Path("test.pdf")
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        def capture_write(
+            tree, output_dir, book_summary=None, index_filename="AGENTS.md"
+        ):
+            output_dir.mkdir(parents=True)
+
+        with (
+            patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+            patch("shelf.cli.split_markdown", return_value=fake_tree),
+            patch("shelf.cli.write_shelf", side_effect=capture_write),
+        ):
+            result = runner.invoke(main, [str(pdf), "--output", "shelf/con-law"])
+
+        assert result.exit_code == 0
+        assert Path("AGENTS.md").exists()
+        content = Path("AGENTS.md").read_text(encoding="utf-8")
+        assert content.startswith("## Shelf Textbook: Constitutional Law\n")
+        assert f"- Textbook path: `./{Path('shelf/con-law').as_posix()}/`" in content
+
+
+def test_shelf_does_not_duplicate_existing_textbook_section(tmp_path):
+    fake_tree = _make_fake_tree()
+    runner = CliRunner()
+
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pdf = Path("test.pdf")
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        existing_section = "\n".join(
+            [
+                "## Shelf Textbook: Constitutional Law",
+                "",
+                "- Textbook path: `./shelf/con-law/`",
+                "- Navigation guide: `./shelf/con-law/AGENTS.md`",
+                "- Source file: `test.pdf`",
+                "- Scope: 1 chapters, 2 sections",
+                "",
+            ]
+        )
+        Path("AGENTS.md").write_text(existing_section, encoding="utf-8")
+
+        def capture_write(
+            tree, output_dir, book_summary=None, index_filename="AGENTS.md"
+        ):
+            output_dir.mkdir(parents=True)
+
+        with (
+            patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+            patch("shelf.cli.split_markdown", return_value=fake_tree),
+            patch("shelf.cli.write_shelf", side_effect=capture_write),
+        ):
+            result = runner.invoke(main, [str(pdf), "--output", "shelf/con-law"])
+
+        assert result.exit_code == 0
+        assert "already exists" in result.output
+        assert Path("AGENTS.md").read_text(encoding="utf-8") == existing_section
+
+
 def test_shelf_unsupported_format(tmp_path):
     docx = tmp_path / "test.docx"
     docx.write_text("content")

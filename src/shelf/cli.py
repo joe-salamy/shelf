@@ -15,6 +15,66 @@ from shelf.split import split_markdown
 from shelf.output import write_shelf
 
 
+def _format_root_textbook_section(
+    tree, rel_out: Path, index_filename: str, chapter_count: int, section_count: int
+) -> str:
+    """Return a compact, textbook-specific AGENTS.md section."""
+    rel_out_text = rel_out.as_posix()
+    source = tree.source_path.name if tree.source_path else "unknown"
+    return "\n".join(
+        [
+            f"## Shelf Textbook: {tree.title}",
+            "",
+            f"- Textbook path: `./{rel_out_text}/`",
+            f"- Navigation guide: `./{rel_out_text}/{index_filename}`",
+            f"- Source file: `{source}`",
+            f"- Scope: {chapter_count} chapters, {section_count} sections",
+        ]
+    )
+
+
+def _append_root_agents_textbook_section(
+    output_dir: Path,
+    rel_out: Path,
+    tree,
+    index_filename: str,
+    chapter_count: int,
+    section_count: int,
+) -> str:
+    """Append a generated-book section to the root AGENTS.md when possible."""
+    root_agents = Path.cwd() / "AGENTS.md"
+
+    try:
+        output_dir.resolve().relative_to(Path.cwd().resolve())
+    except ValueError:
+        return "skipped"
+
+    rel_out_text = rel_out.as_posix()
+    path_line = f"- Textbook path: `./{rel_out_text}/`"
+    section = _format_root_textbook_section(
+        tree, rel_out, index_filename, chapter_count, section_count
+    )
+
+    try:
+        existing = (
+            root_agents.read_text(encoding="utf-8") if root_agents.exists() else ""
+        )
+        if path_line in existing:
+            return "present"
+
+        prefix = ""
+        separator = "\n" if existing else ""
+        if existing and not existing.endswith("\n"):
+            prefix = "\n"
+
+        with root_agents.open("a", encoding="utf-8") as f:
+            f.write(f"{prefix}{separator}{section}\n")
+    except OSError:
+        return "failed"
+
+    return "appended"
+
+
 @click.command()
 @click.argument("input_path", type=click.Path(exists=True, path_type=Path))
 @click.option(
@@ -248,26 +308,24 @@ def main(
     if book_summary:
         click.echo(f"Generated {rel_out}/ENTITIES.md and {rel_out}/GRAPH.md")
 
-    # Suggest how to make the book discoverable
-    click.echo(
-        f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
-        f"  Reference textbooks are in ./{rel_out}/"
-    )
+    if output_dir.exists():
+        pointer_status = _append_root_agents_textbook_section(
+            output_dir,
+            rel_out,
+            tree,
+            index_filename,
+            chapter_count,
+            section_count,
+        )
+    else:
+        pointer_status = "skipped"
 
-    # Auto-append pointer to root AGENTS.md if output dir was actually created
-    root_agents = Path.cwd() / "AGENTS.md"
-    if root_agents.exists() and output_dir.exists():
-        try:
-            output_dir.resolve().relative_to(Path.cwd().resolve())
-        except ValueError:
-            pass  # output dir is outside cwd — skip
-        else:
-            existing = root_agents.read_text(encoding="utf-8")
-            pointer_line = f"\nReference textbooks are in ./{rel_out}/\n"
-            if str(rel_out) not in existing:
-                try:
-                    with root_agents.open("a", encoding="utf-8") as f:
-                        f.write(pointer_line)
-                    click.echo(f"  (Auto-appended to {root_agents.name})")
-                except OSError:
-                    pass
+    if pointer_status == "appended":
+        click.echo(f"Added textbook pointer to {Path.cwd() / 'AGENTS.md'}")
+    elif pointer_status == "present":
+        click.echo(f"Textbook pointer already exists in {Path.cwd() / 'AGENTS.md'}")
+    else:
+        click.echo(
+            f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
+            f"{_format_root_textbook_section(tree, rel_out, index_filename, chapter_count, section_count)}"
+        )

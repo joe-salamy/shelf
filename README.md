@@ -43,13 +43,18 @@ shelf ~/Downloads/con-law.pdf  # creates shelf/con-law/ here
 
 Shelf creates the output directory (`shelf/con-law/`) in your current working directory. **You don't move the textbook** — just pass its path.
 
-**2. Tell your agent it exists** by adding one line to your project's `AGENTS.md`:
+**2. Tell your agent it exists**. Shelf automatically adds a compact textbook-specific section to your project's root `AGENTS.md`:
 
 ```markdown
-Reference textbooks are in ./shelf/con-law/
+## Shelf Textbook: Constitutional Law
+
+- Textbook path: `./shelf/con-law/`
+- Navigation guide: `./shelf/con-law/AGENTS.md`
+- Source file: `con-law.pdf`
+- Scope: 8 chapters, 42 sections
 ```
 
-Shelf prints this suggested line after conversion. Shelf also generates its own `AGENTS.md` inside `shelf/con-law/` for agent-specific navigation. Use `--index-filename` if your harness expects a different filename.
+Shelf does not duplicate the shared Shelf file guide in the project root when you add multiple textbooks. Each textbook gets one root section, and Shelf also generates a detailed `AGENTS.md` inside `shelf/con-law/`. Use `--index-filename` if your harness expects a different filename.
 
 **3. Ask your agent questions about the textbook:**
 
