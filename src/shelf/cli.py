@@ -36,13 +36,13 @@ from shelf.output import write_shelf
     "-s",
     is_flag=True,
     default=False,
-    help="Generate cascading CLAUDE.md summaries and entity indexes via LLM",
+    help="Generate cascading agent summaries and entity indexes via LLM",
 )
 @click.option(
     "--index-filename",
-    default="CLAUDE.md",
+    default="AGENTS.md",
     show_default=True,
-    help="Filename for navigation index files (e.g. AGENTS.md for non-Claude harnesses)",
+    help="Filename for navigation index files",
 )
 @click.option(
     "--max-section-chars",
@@ -225,24 +225,24 @@ def main(
 
     # Suggest how to make the book discoverable
     click.echo(
-        f"\nAdd this to your root CLAUDE.md to make this book discoverable:\n"
+        f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
         f"  Reference textbooks are in ./{rel_out}/"
     )
 
-    # Auto-append pointer to root CLAUDE.md if output dir was actually created
-    root_claude = Path.cwd() / "CLAUDE.md"
-    if root_claude.exists() and output_dir.exists():
+    # Auto-append pointer to root AGENTS.md if output dir was actually created
+    root_agents = Path.cwd() / "AGENTS.md"
+    if root_agents.exists() and output_dir.exists():
         try:
             output_dir.resolve().relative_to(Path.cwd().resolve())
         except ValueError:
             pass  # output dir is outside cwd — skip
         else:
-            existing = root_claude.read_text(encoding="utf-8")
+            existing = root_agents.read_text(encoding="utf-8")
             pointer_line = f"\nReference textbooks are in ./{rel_out}/\n"
             if str(rel_out) not in existing:
                 try:
-                    with root_claude.open("a", encoding="utf-8") as f:
+                    with root_agents.open("a", encoding="utf-8") as f:
                         f.write(pointer_line)
-                    click.echo(f"  (Auto-appended to {root_claude.name})")
+                    click.echo(f"  (Auto-appended to {root_agents.name})")
                 except OSError:
                     pass

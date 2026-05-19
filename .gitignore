@@ -21,8 +21,6 @@ docs/
 *.key
 textbook-tests/
 logs/
-.claude/
-CLAUDE.md
 .codex/
 .vscode/
 .idea/

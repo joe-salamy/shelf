@@ -12,7 +12,7 @@ Now try giving an agent a textbook.
 
 The options are bleak. You can paste chapters into the context window and burn tokens on boilerplate front matter. You can stand up a vector database, embed everything, and hope retrieval surfaces the right chunk at query time — a setup that takes an afternoon and introduces a new failure mode (wrong chunks, stale embeddings, silent degradation). Or you can point the agent at a raw PDF and watch it fail silently because PDF text extraction is, charitably, a disaster of two-column layouts, ligatures, and invisible hyphenation.
 
-This is the RAG tax: the cost in infrastructure, latency, and cognitive overhead that every developer pays just to let an agent read a book. For exploratory use — a student building a study tool, a developer who wants their agent to reference a technical manual, a lawyer giving Claude access to a statute — the tax is prohibitive.
+This is the RAG tax: the cost in infrastructure, latency, and cognitive overhead that every developer pays just to let an agent read a book. For exploratory use — a student building a study tool, a developer who wants their agent to reference a technical manual, a lawyer giving an agent access to a statute — the tax is prohibitive.
 
 The gap in the agentic ecosystem isn't a missing embedding model. It's the missing step between "I have a PDF" and "my agent can navigate it like a codebase."
 
@@ -30,7 +30,7 @@ The Shelf philosophy has three rules:
 
 1. **Filesystem is the index.** Directory structure mirrors the book's table of contents. The agent can discover what exists by listing files.
 2. **Markdown is the format.** No custom formats, no database records. Everything is readable by any tool in the agent's toolkit.
-3. **AI is opt-in.** The baseline pipeline requires no API keys, no models, no internet connection. AI enhancements — summaries, CLAUDE.md generation — are flags the user chooses to enable.
+3. **AI is opt-in.** The baseline pipeline requires no API keys, no models, no internet connection. AI enhancements — summaries and richer agent guide generation — are flags the user chooses to enable.
 
 ---
 
@@ -98,13 +98,13 @@ $ cat shelf/textbook/02-judicial-review/03-standards-of-scrutiny.md
 $ ls shelf/textbook/03-the-commerce-clause/
 ```
 
-In Claude Code, this looks like:
+In an agent harness, this looks like:
 
 ```
 > What does this textbook say about the limits of the commerce clause
   after Lopez?
 
-[Claude globs shelf/textbook/03-the-commerce-clause/, reads the relevant
+[The agent globs shelf/textbook/03-the-commerce-clause/, reads the relevant
 sections, synthesizes an answer grounded in the actual text]
 ```
 
@@ -121,9 +121,9 @@ With `--summarize`, Shelf makes an additional pass using a language model (local
 - One-paragraph summaries for each chapter, prepended to the section file
 - An enriched `INDEX.md` with those summaries inline
 
-A `CLAUDE.md` is generated inside the output directory by default — no flag required. It reflects the actual book structure: section count, chapter names, and suggested search targets.
+An `AGENTS.md` is generated inside the output directory by default — no flag required. It reflects the actual book structure: section count, chapter names, and suggested search targets.
 
-The `--summarize` flag is strictly opt-in. The baseline Shelf output — including the `CLAUDE.md` — is useful without it.
+The `--summarize` flag is strictly opt-in. The baseline Shelf output — including the `AGENTS.md` — is useful without it.
 
 ---
 
@@ -158,7 +158,7 @@ When `--summarize` is passed, Shelf runs a second pass with a configurable LLM b
 - **Local (default):** Uses Ollama or llama.cpp if present — no API key required
 - **Cloud:** Uses the Gemini API, OpenAI API, or any OpenAI-compatible endpoint via `SHELF_LLM_*` environment variables
 
-The AI layer generates per-section summaries. A `CLAUDE.md` is always generated inside the book's output directory — containing navigation instructions specific to this book's structure, including section count, chapter names, and grep targets. It does not modify the core section content — summaries are prepended as a distinct block.
+The AI layer generates per-section summaries. An `AGENTS.md` is always generated inside the book's output directory — containing navigation instructions specific to this book's structure, including section count, chapter names, and grep targets. It does not modify the core section content — summaries are prepended as a distinct block.
 
 ### Plugin Architecture
 
@@ -166,16 +166,16 @@ Convert backends and LLM backends are both pluggable. A `shelf.backends` entry p
 
 ---
 
-## Agent-Native by Design: The Claude Code Story
+## Agent-Native by Design
 
-Shelf's first-class integration target is Claude Code — Anthropic's agentic coding CLI. The integration has two parts.
+Shelf targets agentic coding harnesses and other tools that read local markdown. The integration has two parts.
 
-### Subdirectory CLAUDE.md
+### Subdirectory AGENTS.md
 
-Shelf generates a `CLAUDE.md` _inside_ each book's output directory — not at the project root. Claude Code auto-loads subdirectory CLAUDE.md files on demand, when the agent reads files in that directory. That means the file is loaded only when relevant, and only for that book.
+Shelf generates an `AGENTS.md` _inside_ each book's output directory — not at the project root. Use `--index-filename` if your harness expects a different filename.
 
 ```markdown
-# CLAUDE.md — Constitutional Law Textbook
+# AGENTS.md — Constitutional Law Textbook
 
 This directory contains a shelf-structured version of "Constitutional Law"
 by Kathleen Sullivan and Noah Feldman (19th ed.).
@@ -201,28 +201,28 @@ by Kathleen Sullivan and Noah Feldman (19th ed.).
 - Source: PDF converted via Shelf v0.1
 ```
 
-This file lives at `shelf/constitutional-law/CLAUDE.md`. Ten textbooks means ten self-contained CLAUDE.md files — each loaded only when the agent enters that book's directory. No context bloat at the project level.
+This file lives at `shelf/constitutional-law/AGENTS.md`. Ten textbooks means ten self-contained AGENTS.md files.
 
 ### Discovery
 
-After conversion, Shelf prints a one-liner the user can paste into their root CLAUDE.md:
+After conversion, Shelf prints a one-liner the user can paste into their root AGENTS.md:
 
 ```
 $ shelf constitutional-law.pdf
 
 ✓ Wrote 42 sections across 8 chapters → shelf/constitutional-law/
-✓ Generated shelf/constitutional-law/CLAUDE.md
+✓ Generated shelf/constitutional-law/AGENTS.md
 
-Add this to your root CLAUDE.md to make this book discoverable:
+Add this to your root AGENTS.md to make this book discoverable:
 
   Reference textbooks are in ./shelf/constitutional-law/
 ```
 
-Non-invasive. Shelf doesn't touch your project's root CLAUDE.md — it just tells you what to add.
+Non-invasive. Shelf only appends to your project's root AGENTS.md when that file already exists and the output is under the current working directory; otherwise, it tells you what to add.
 
 ### An Agent Navigation Session
 
-What this looks like in practice, inside Claude Code:
+What this looks like in practice, inside an agent harness:
 
 ```
 > What's the textbook's treatment of rational basis review?
@@ -247,7 +247,7 @@ Four tool calls. No retrieval service. Grounded in the actual text.
 | TOC navigation      | Smart INDEX.md with links    | None          | None               | Semantic search only |
 | Hierarchy preserved | Yes (dir structure)          | No            | Partial            | No                   |
 | Zero-setup baseline | Yes                          | Yes           | Yes                | No                   |
-| Agent-native output | Yes (subdirectory CLAUDE.md) | No            | No                 | Partial              |
+| Agent-native output | Yes (subdirectory AGENTS.md) | No            | No                 | Partial              |
 | AI requirement      | None (opt-in)                | None          | None               | Required             |
 | EPUB support        | Yes                          | No            | No                 | Via preprocessing    |
 | Pluggable backends  | Yes                          | N/A           | N/A                | Varies               |
@@ -265,7 +265,7 @@ The key differentiator is the combination: markdown-native chapter files + smart
 - Heuristic header detection and split
 - Nested directory output with smart `INDEX.md`
 - `--summarize` flag for optional AI pass
-- Subdirectory `CLAUDE.md` generated by default for every conversion
+- Subdirectory `AGENTS.md` generated by default for every conversion
 - Importable Python library (`from shelf import convert`)
 - Click-based CLI
 
@@ -300,4 +300,4 @@ Shelf has no runtime dependencies beyond its convert backends. The core pipeline
 
 ---
 
-_Shelf is in active development. The v1 milestone targets PDF and EPUB conversion with heuristic TOC detection and Claude Code integration._
+_Shelf is in active development. The v1 milestone targets PDF and EPUB conversion with heuristic TOC detection and agent-harness integration._

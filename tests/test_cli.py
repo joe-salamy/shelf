@@ -91,7 +91,7 @@ def test_shelf_prints_success_message(tmp_path):
     assert "Done!" in result.output
     assert "sections" in result.output
     assert "chapters" in result.output
-    assert "CLAUDE.md" in result.output
+    assert "AGENTS.md" in result.output
 
 
 def test_shelf_unsupported_format(tmp_path):
@@ -115,7 +115,7 @@ def test_shelf_default_output_dir(tmp_path):
     fake_tree = _make_fake_tree()
     captured_args = {}
 
-    def capture_write(tree, output_dir, book_summary=None, index_filename="CLAUDE.md"):
+    def capture_write(tree, output_dir, book_summary=None, index_filename="AGENTS.md"):
         captured_args["output_dir"] = output_dir
 
     runner = CliRunner()
@@ -167,7 +167,7 @@ def test_shelf_index_filename_flag(tmp_path):
     fake_tree = _make_fake_tree()
     captured_args = {}
 
-    def capture_write(tree, output_dir, book_summary=None, index_filename="CLAUDE.md"):
+    def capture_write(tree, output_dir, book_summary=None, index_filename="AGENTS.md"):
         captured_args["index_filename"] = index_filename
 
     runner = CliRunner()
@@ -176,7 +176,7 @@ def test_shelf_index_filename_flag(tmp_path):
         patch("shelf.cli.split_markdown", return_value=fake_tree),
         patch("shelf.cli.write_shelf", side_effect=capture_write),
     ):
-        result = runner.invoke(main, [str(pdf), "--index-filename", "AGENTS.md"])
+        result = runner.invoke(main, [str(pdf), "--index-filename", "NAV.md"])
 
     assert result.exit_code == 0
-    assert captured_args["index_filename"] == "AGENTS.md"
+    assert captured_args["index_filename"] == "NAV.md"

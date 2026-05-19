@@ -26,18 +26,18 @@ def write_shelf(
     tree: BookTree,
     output_dir: Path,
     book_summary: "BookSummary | None" = None,
-    index_filename: str = "CLAUDE.md",
+    index_filename: str = "AGENTS.md",
 ) -> None:
     """Materialize the BookTree as a nested markdown directory.
 
     Layout:
       output_dir/
         INDEX.md              — linked TOC
-        CLAUDE.md             — navigation guide (or custom *index_filename*)
+        AGENTS.md             — navigation guide (or custom *index_filename*)
         ENTITIES.md           — entity index (if summarized)
         GRAPH.md              — entity relationships (if summarized)
         01-chapter-slug/
-          CLAUDE.md           — chapter navigation (if summarized)
+          AGENTS.md           — chapter navigation (if summarized)
           CONCEPTS.md         — chapter entities (if summarized)
           00-introduction.md           — H1 body content
           01-section-slug.md
@@ -80,7 +80,7 @@ def write_shelf(
             sec_content = _render_section(section)
             sec_file.write_text(sec_content, encoding="utf-8")
 
-        # Chapter-level CLAUDE.md and CONCEPTS.md (if summarized)
+        # Chapter-level AGENTS.md and CONCEPTS.md (if summarized)
         chapter_summary = ch_summary_map.get(chapter.title)
         if chapter_summary:
             _write_chapter_index(ch_dir, chapter_summary, index_filename)
@@ -123,7 +123,7 @@ def write_shelf(
     index_lines.append("")
     (output_dir / "INDEX.md").write_text("\n".join(index_lines), encoding="utf-8")
 
-    # Root navigation file (CLAUDE.md or custom name)
+    # Root navigation file (AGENTS.md or custom name)
     _write_root_index(output_dir, tree, chapters, book_summary, index_filename)
 
     # Entity indexes (if summarized)
@@ -146,7 +146,7 @@ def _write_root_index(
     book_summary: "BookSummary | None",
     index_filename: str,
 ) -> None:
-    """Write the root navigation index file (CLAUDE.md or custom name)."""
+    """Write the root navigation index file (AGENTS.md or custom name)."""
     chapter_count = len(chapters)
     section_count = sum(len(ch.children) for ch in chapters)
     subsection_count = sum(len(sec.children) for ch in chapters for sec in ch.children)
@@ -228,7 +228,7 @@ def _write_chapter_index(
     chapter_summary: "ChapterSummary",
     index_filename: str,
 ) -> None:
-    """Write a chapter-level CLAUDE.md (or custom name) with section summaries."""
+    """Write a chapter-level AGENTS.md (or custom name) with section summaries."""
     lines = [
         f"# {chapter_summary.chapter_title} — Navigation Guide",
         "",

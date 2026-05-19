@@ -32,7 +32,7 @@ Once installed, activate this environment whenever you want to use the `shelf` c
 
 ## Real-World Workflow
 
-Here's what a typical session looks like using this with Claude Code:
+Here's what a typical session looks like using this with an agent:
 
 **1. Convert your textbook from your notes/project directory:**
 
@@ -43,20 +43,20 @@ shelf ~/Downloads/con-law.pdf  # creates shelf/con-law/ here
 
 Shelf creates the output directory (`shelf/con-law/`) in your current working directory. **You don't move the textbook** — just pass its path.
 
-**2. Tell Claude Code it exists** by adding one line to your project's `CLAUDE.md`:
+**2. Tell your agent it exists** by adding one line to your project's `AGENTS.md`:
 
 ```markdown
 Reference textbooks are in ./shelf/con-law/
 ```
 
-Shelf prints this suggested line after conversion. Shelf also generates its own `CLAUDE.md` inside `shelf/con-law/` that Claude Code loads automatically when it reads files in that directory.
+Shelf prints this suggested line after conversion. Shelf also generates its own `AGENTS.md` inside `shelf/con-law/` for agent-specific navigation. Use `--index-filename` if your harness expects a different filename.
 
-**3. Ask Claude Code questions about the textbook:**
+**3. Ask your agent questions about the textbook:**
 
 ```
 > What does the textbook say about rational basis review?
 
-[Claude globs shelf/con-law/*/*.md, greps for "rational basis", reads the relevant sections]
+[The agent globs shelf/con-law/*/*.md, greps for "rational basis", reads the relevant sections]
 
 The textbook distinguishes two flavors of rational basis...
 ```
@@ -70,7 +70,7 @@ No retrieval pipeline. No context window stuffed with irrelevant chunks.
 ```
 constitutional-law/
 ├── INDEX.md                          # Linked table of contents
-├── CLAUDE.md                         # Agent navigation guide (auto-generated)
+├── AGENTS.md                         # Agent navigation guide (auto-generated)
 ├── 01-introduction/
 │   ├── README.md
 │   ├── 01-what-is-constitutional-law.md
@@ -82,7 +82,7 @@ constitutional-law/
 └── ...
 ```
 
-The `INDEX.md` is a full linked table of contents. The `CLAUDE.md` describes the book's structure so Claude Code knows how to navigate it — it's loaded only when the agent reads files in that directory, so it doesn't clutter your project context.
+The `INDEX.md` is a full linked table of contents. The `AGENTS.md` describes the book's structure so agents know how to navigate it without cluttering your project context.
 
 ---
 
@@ -142,7 +142,7 @@ shelf textbook.pdf --summarize
 
 1. **Convert** — PDF or EPUB → single markdown string (`pymupdf4llm` for PDF, `markitdown` for EPUB)
 2. **Split** — Parse ATX headers, build nested `Section` tree up to `--depth`
-3. **Output** — Write numbered directories, section files, `INDEX.md`, and `CLAUDE.md`
+3. **Output** — Write numbered directories, section files, `INDEX.md`, and `AGENTS.md`
 4. **Summarize** _(optional)_ — Walk the tree, call LLM, prepend summaries
 
 ## License

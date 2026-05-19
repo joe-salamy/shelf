@@ -180,18 +180,18 @@ def test_index_md_contains_h3_anchors(tmp_path):
     assert "#" in content  # anchor link
 
 
-def test_claude_md_created(tmp_path):
+def test_agents_md_created(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out)
-    assert (out / "CLAUDE.md").exists()
+    assert (out / "AGENTS.md").exists()
 
 
-def test_claude_md_contains_stats(tmp_path):
+def test_agents_md_contains_stats(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out)
-    content = (out / "CLAUDE.md").read_text()
+    content = (out / "AGENTS.md").read_text()
     assert "2" in content  # chapter count
     assert "grep" in content.lower()
 
@@ -229,18 +229,18 @@ def test_empty_chapter_no_section_files(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_chapter_claude_md_created_with_summary(tmp_path):
+def test_chapter_agents_md_created_with_summary(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    assert (out / "01-chapter-one" / "CLAUDE.md").exists()
+    assert (out / "01-chapter-one" / "AGENTS.md").exists()
 
 
-def test_chapter_claude_md_contains_section_summaries(tmp_path):
+def test_chapter_agents_md_contains_section_summaries(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "01-chapter-one" / "CLAUDE.md").read_text()
+    content = (out / "01-chapter-one" / "AGENTS.md").read_text()
     assert "Section One Point One" in content
     assert "important concepts" in content
     assert "Point A" in content
@@ -304,19 +304,19 @@ def test_root_graph_md_contains_relationships(tmp_path):
     assert "Fourteenth Amendment" in content
 
 
-def test_root_claude_md_contains_overview(tmp_path):
+def test_root_agents_md_contains_overview(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "CLAUDE.md").read_text()
+    content = (out / "AGENTS.md").read_text()
     assert "constitutional law" in content.lower()
 
 
-def test_root_claude_md_contains_chapter_summaries(tmp_path):
+def test_root_agents_md_contains_chapter_summaries(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "CLAUDE.md").read_text()
+    content = (out / "AGENTS.md").read_text()
     assert "Chapter One" in content
     assert "comprehensive overview" in content
 
@@ -337,12 +337,12 @@ def test_custom_index_filename(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(
-        tree, out, book_summary=_make_book_summary(), index_filename="AGENTS.md"
+        tree, out, book_summary=_make_book_summary(), index_filename="GUIDE.md"
     )
-    assert (out / "AGENTS.md").exists()
-    assert not (out / "CLAUDE.md").exists()
+    assert (out / "GUIDE.md").exists()
+    assert not (out / "AGENTS.md").exists()
     # Chapter level too
-    assert (out / "01-chapter-one" / "AGENTS.md").exists()
+    assert (out / "01-chapter-one" / "GUIDE.md").exists()
 
 
 def test_no_summary_files_without_book_summary(tmp_path):
@@ -353,5 +353,5 @@ def test_no_summary_files_without_book_summary(tmp_path):
     assert not (out / "ENTITIES.md").exists()
     assert not (out / "GRAPH.md").exists()
     assert not (out / "01-chapter-one" / "CONCEPTS.md").exists()
-    # But should still have root CLAUDE.md
-    assert (out / "CLAUDE.md").exists()
+    # But should still have root AGENTS.md
+    assert (out / "AGENTS.md").exists()

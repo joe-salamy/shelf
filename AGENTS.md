@@ -14,7 +14,7 @@ Shelf is a CLI tool that converts PDF and EPUB textbooks into nested, grep-frien
 ## Off-Limits Files
 
 - Never read from, write to, or git diff `docs/scratchpad.md`.
-- When running `/code-reviewer` or `/python-pro`, exclude diffs of files in `.claude/` and `docs/` — these are settings/prose, not reviewable code.
+- When running `/code-reviewer` or `/python-pro`, exclude diffs of hidden harness config directories and `docs/` — these are settings/prose, not reviewable code.
 
 ## Plan Mode
 
