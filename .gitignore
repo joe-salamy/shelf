@@ -23,7 +23,7 @@ textbook-tests/
 logs/
 .claude/
 CLAUDE.md
-.codex/settings.local.json
+.codex/
 .vscode/
 .idea/
 *.swp
