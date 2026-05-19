@@ -1,5 +1,7 @@
 """LLM prompt templates for the summarization pipeline."""
 
+from shelf.summarize.taxonomy import VALID_KINDS, VALID_RELATIONS, format_taxonomy
+
 SECTION_PROMPT = (
     "You are analyzing a section from a textbook. "
     "Given the section content below, return a JSON object with exactly these keys:\n\n"
@@ -8,13 +10,13 @@ SECTION_PROMPT = (
     '2. "key_points": An array of 3-7 bullet-point takeaways (strings, each '
     "under 20 words).\n"
     '3. "entities": An array of objects, each with:\n'
-    '   - "name": the term, case name, person, or statute\n'
-    '   - "kind": one of "term", "case", "person", "statute", "concept"\n'
+    '   - "name": the named concept, term, equation, method, person, work, '
+    "or other important textbook entity\n"
+    f'   - "kind": one of {format_taxonomy(VALID_KINDS)}\n'
     '   - "definition": a one-line description (under 25 words)\n'
     '4. "relationships": An array of objects, each with:\n'
     '   - "source": entity name\n'
-    '   - "relation": one of "PART-OF", "DEFINES", "CITED-IN", "APPLIES-IN", '
-    '"OVERRULES", "ESTABLISHES", "PREREQUISITE-FOR", "RELATED-TO"\n'
+    f'   - "relation": one of {format_taxonomy(VALID_RELATIONS)}\n'
     '   - "target": entity name\n'
     '5. "prerequisites": An array of concept/term names the reader should '
     "already know.\n"

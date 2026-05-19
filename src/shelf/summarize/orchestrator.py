@@ -13,8 +13,6 @@ from shelf.config import SHELF_PARALLEL_WORKERS
 from shelf.models import BookTree, Section
 from shelf.summarize.base import LLMBackend
 from shelf.summarize.exceptions import ContextWindowExceededError
-
-logger = logging.getLogger(__name__)
 from shelf.summarize.models import (
     BookSummary,
     ChapterSummary,
@@ -28,6 +26,14 @@ from shelf.summarize.prompts import (
     SECTION_PROMPT,
 )
 from shelf.summarize.splitter import split_section_content
+from shelf.summarize.taxonomy import (
+    VALID_KINDS,
+    VALID_RELATIONS,
+    normalize_entity_kind,
+    normalize_relation,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def generate_book_summary(
@@ -121,9 +127,8 @@ def generate_book_summary(
         }
         for chapter_future in as_completed(future_to_idx):
             idx = future_to_idx[chapter_future]
-            _log(
-                f"Chapter {idx + 1}/{len(rollup_chapters)}: {rollup_chapters[idx].title}"
-            )
+            title = rollup_chapters[idx].title
+            _log(f"Chapter {idx + 1}/{len(rollup_chapters)}: {title}")
             chapter_summaries[idx] = chapter_future.result()
 
     # All slots filled — narrow the type
@@ -215,17 +220,6 @@ _EXPECTED_SECTION_KEYS = {
     "prerequisites",
     "leads_to",
 }
-_VALID_KINDS = {"term", "case", "person", "statute", "concept"}
-_VALID_RELATIONS = {
-    "PART-OF",
-    "DEFINES",
-    "CITED-IN",
-    "APPLIES-IN",
-    "OVERRULES",
-    "ESTABLISHES",
-    "PREREQUISITE-FOR",
-    "RELATED-TO",
-}
 
 
 def _parse_section_response(
@@ -267,12 +261,13 @@ def _parse_section_response(
                 "Section '%s': dropped malformed entity: %s", section_title, e
             )
             continue
-        kind = e.get("kind", "concept")
-        if kind not in _VALID_KINDS:
+        raw_kind = e.get("kind", "concept")
+        kind = normalize_entity_kind(raw_kind)
+        if kind not in VALID_KINDS:
             logger.warning(
                 "Section '%s': unexpected entity kind '%s' for '%s'",
                 section_title,
-                kind,
+                raw_kind,
                 e.get("name"),
             )
         entities.append(
@@ -291,12 +286,13 @@ def _parse_section_response(
                 "Section '%s': dropped malformed relationship: %s", section_title, r
             )
             continue
-        relation = r.get("relation", "")
-        if relation not in _VALID_RELATIONS:
+        raw_relation = r.get("relation", "")
+        relation = normalize_relation(raw_relation)
+        if relation not in VALID_RELATIONS:
             logger.warning(
                 "Section '%s': unexpected relation '%s' (%s -> %s)",
                 section_title,
-                relation,
+                raw_relation,
                 r.get("source"),
                 r.get("target"),
             )

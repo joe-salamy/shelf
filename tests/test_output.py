@@ -49,6 +49,11 @@ def _make_book_summary() -> BookSummary:
             Entity(
                 name="Lochner v. NY", kind="case", definition="1905 labor law case."
             ),
+            Entity(
+                name="Schrodinger equation",
+                kind="equation",
+                definition="Describes quantum mechanical wave functions.",
+            ),
         ],
         relationships=[
             Relationship(
@@ -75,6 +80,11 @@ def _make_book_summary() -> BookSummary:
             Entity(
                 name="Lochner v. NY", kind="case", definition="1905 labor law case."
             ),
+            Entity(
+                name="Schrodinger equation",
+                kind="equation",
+                definition="Describes quantum mechanical wave functions.",
+            ),
         ],
         relationships=[
             Relationship(
@@ -99,6 +109,11 @@ def _make_book_summary() -> BookSummary:
             ),
             Entity(
                 name="Lochner v. NY", kind="case", definition="1905 labor law case."
+            ),
+            Entity(
+                name="Schrodinger equation",
+                kind="equation",
+                definition="Describes quantum mechanical wave functions.",
             ),
         ],
         all_relationships=[
@@ -298,6 +313,7 @@ def test_chapter_concepts_md_contains_entities(tmp_path):
     content = (out / "01-chapter-one" / "CONCEPTS.md").read_text()
     assert "Due Process" in content
     assert "Lochner v. NY" in content
+    assert "Schrodinger equation" in content
 
 
 def test_chapter_concepts_md_contains_prerequisites(tmp_path):
@@ -323,6 +339,7 @@ def test_root_entities_md_contains_entities(tmp_path):
     content = (out / "ENTITIES.md").read_text()
     assert "Due Process" in content
     assert "Lochner v. NY" in content
+    assert "Schrodinger equation" in content
 
 
 def test_root_graph_md_created(tmp_path):
@@ -399,9 +416,7 @@ def test_index_md_contains_descriptions_with_summary(tmp_path):
 def test_custom_index_filename(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
-    write_shelf(
-        tree, out, book_summary=_make_book_summary(), index_filename="GUIDE.md"
-    )
+    write_shelf(tree, out, book_summary=_make_book_summary(), index_filename="GUIDE.md")
     assert (out / "GUIDE.md").exists()
     assert not (out / "AGENTS.md").exists()
     # Chapter level too

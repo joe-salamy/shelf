@@ -10,7 +10,7 @@ class Entity:
     """A named entity extracted from textbook content."""
 
     name: str
-    kind: str  # "term", "case", "person", "statute", "concept"
+    kind: str
     definition: str
 
 

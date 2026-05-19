@@ -16,6 +16,12 @@ from shelf.summarize.orchestrator import (
     generate_book_summary,
 )
 from shelf.summarize.prompts import BOOK_ROLLUP_PROMPT
+from shelf.summarize.taxonomy import (
+    VALID_KINDS,
+    VALID_RELATIONS,
+    normalize_entity_kind,
+    normalize_relation,
+)
 
 # ---------------------------------------------------------------------------
 # Mock backend
@@ -169,6 +175,25 @@ def test_relationships_extracted():
     assert len(result.all_relationships) > 0
     rel = result.all_relationships[0]
     assert rel.source == "Due Process"
+
+
+def test_taxonomy_supports_non_law_textbooks():
+    assert {"equation", "law", "molecule", "treatment", "constant"} <= VALID_KINDS
+    assert {
+        "USES",
+        "DERIVES",
+        "CONTAINS",
+        "EQUALS",
+        "DEPENDS-ON",
+        "SUBSET-OF",
+    } <= VALID_RELATIONS
+
+
+def test_taxonomy_normalizes_common_llm_variants():
+    assert normalize_entity_kind("Equation") == "equation"
+    assert normalize_entity_kind("data set") == "data_set"
+    assert normalize_relation("calculated_from") == "CALCULATED-FROM"
+    assert normalize_relation("cites") == "CITED-IN"
 
 
 def test_llm_call_count():

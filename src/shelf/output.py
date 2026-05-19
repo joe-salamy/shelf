@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from shelf.models import BookTree, Section
 from shelf.slugify import slugify
+from shelf.summarize.taxonomy import ENTITY_KIND_LABELS
 
 if TYPE_CHECKING:
     from shelf.summarize.models import (
@@ -345,15 +346,7 @@ def _write_chapter_concepts(
     for e in chapter_summary.entities:
         by_kind.setdefault(e.kind, []).append(e)
 
-    kind_labels = {
-        "term": "Terms",
-        "case": "Cases",
-        "person": "People",
-        "statute": "Statutes",
-        "concept": "Concepts",
-    }
-
-    for kind, label in kind_labels.items():
+    for kind, label in _entity_kind_sections(by_kind):
         entities = by_kind.get(kind, [])
         if entities:
             lines.append(f"## {label}")
@@ -445,15 +438,9 @@ def _write_root_entities(
     lines = [f"# {book_title} — Entity Index", ""]
 
     # Group by kind
-    kind_labels = {
-        "term": "Terms",
-        "case": "Cases",
-        "person": "People",
-        "statute": "Statutes",
-        "concept": "Concepts",
-    }
-
-    for kind, label in kind_labels.items():
+    for kind, label in _entity_kind_sections(
+        {e.kind: [] for e in book_summary.all_entities}
+    ):
         kind_entities = [e for e in book_summary.all_entities if e.kind == kind]
         if not kind_entities:
             continue
@@ -471,6 +458,18 @@ def _write_root_entities(
         lines.append("")
 
     (output_dir / "ENTITIES.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _entity_kind_sections(by_kind: dict[str, list["Entity"]]) -> list[tuple[str, str]]:
+    known = [
+        (kind, label) for kind, label in ENTITY_KIND_LABELS.items() if kind in by_kind
+    ]
+    unknown = [
+        (kind, kind.replace("_", " ").replace("-", " ").title())
+        for kind in sorted(by_kind)
+        if kind not in ENTITY_KIND_LABELS
+    ]
+    return known + unknown
 
 
 def _write_root_graph(
