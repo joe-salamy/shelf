@@ -159,7 +159,12 @@ def _write_root_index(
     ]
 
     if book_summary and book_summary.overview:
-        lines += ["## Overview", "", book_summary.overview, ""]
+        lines += [
+            "## Textbook overview",
+            "",
+            _first_sentence(book_summary.overview),
+            "",
+        ]
 
     lines += [
         "## Structure",
@@ -185,20 +190,9 @@ def _write_root_index(
             lines.append(cs.summary)
             lines.append("")
 
-    lines += [
-        "## How to navigate",
-        "",
-        "- `INDEX.md` — full linked table of contents",
-        "- Each chapter is a directory: `01-chapter-name/`",
-        "- Each section is a file: `01-chapter-name/01-section-name.md`",
-        "- Chapter overview: `01-chapter-name/00-introduction.md`",
-    ]
-    if book_summary:
-        lines += [
-            "- `ENTITIES.md` — all terms, cases, people with file locations",
-            "- `GRAPH.md` — entity relationships",
-            f"- Each chapter has `{index_filename}` and `CONCEPTS.md`",
-        ]
+    lines += _root_file_guide(
+        index_filename=index_filename, summarized=bool(book_summary)
+    )
     lines += [
         "",
         "## Grep hints",
@@ -225,6 +219,74 @@ def _write_root_index(
     (output_dir / index_filename).write_text("\n".join(lines), encoding="utf-8")
 
 
+def _root_file_guide(index_filename: str, summarized: bool) -> list[str]:
+    """Describe the files Shelf writes at the textbook and chapter layers."""
+    lines = [
+        "## File guide",
+        "",
+        "### Textbook root",
+        "",
+        f"- `{index_filename}` — this agent-facing guide to the textbook's "
+        "purpose, structure, generated files, and search strategy",
+        "- `INDEX.md` — full linked table of contents for every chapter, section, "
+        "and subsection anchor",
+        "- `front-matter.md` — preface or other non-chapter opening material, "
+        "when detected",
+    ]
+    if summarized:
+        lines += [
+            "- `ENTITIES.md` — textbook-wide lookup table of extracted terms, "
+            "cases, people, statutes, and concepts with file links",
+            "- `GRAPH.md` — textbook-wide entity relationship graph, one "
+            "grep-friendly relationship per line",
+        ]
+    else:
+        lines += [
+            "- `ENTITIES.md` — generated when summarization is enabled; "
+            "textbook-wide lookup table of extracted entities with file links",
+            "- `GRAPH.md` — generated when summarization is enabled; "
+            "textbook-wide entity relationship graph",
+        ]
+
+    lines += [
+        "",
+        "### Chapter directories",
+        "",
+        "- `00-introduction.md` — chapter title and introductory H1 content",
+        "- `NN-section-title.md` — one file per H2 section; H3 and deeper "
+        "headings remain inside the section file as markdown headings",
+    ]
+    if summarized:
+        lines += [
+            f"- `{index_filename}` — chapter-level agent guide with the chapter "
+            "summary, section summaries, and key points",
+            "- `CONCEPTS.md` — chapter-level concepts, entities, prerequisites, "
+            "and follow-on topics",
+        ]
+    else:
+        lines += [
+            f"- `{index_filename}` — generated inside chapters when "
+            "summarization is enabled; chapter-level guide with summaries "
+            "and key points",
+            "- `CONCEPTS.md` — generated when summarization is enabled; "
+            "chapter-level concepts, entities, prerequisites, and follow-on topics",
+        ]
+
+    lines += [
+        "",
+        "## How to navigate",
+        "",
+        "- Start with `INDEX.md` to find the relevant chapter or section.",
+        "- Use root `ENTITIES.md` or `GRAPH.md` for cross-chapter term lookup "
+        "when summarization output is present.",
+        "- Open a chapter guide when you need chapter-specific summaries before "
+        "reading the section files.",
+        "- Read `00-introduction.md` for chapter-level framing and "
+        "`NN-section-title.md` for source text.",
+    ]
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Chapter-level file writers
 # ---------------------------------------------------------------------------
@@ -242,6 +304,16 @@ def _write_chapter_index(
         "## Summary",
         "",
         chapter_summary.summary,
+        "",
+        "## File guide",
+        "",
+        f"- `{index_filename}` — this chapter-level guide with the chapter "
+        "summary, section summaries, and key points",
+        "- `CONCEPTS.md` — chapter-local concepts, entities, prerequisites, "
+        "and follow-on topics",
+        "- `00-introduction.md` — chapter title and introductory H1 content",
+        "- `NN-section-title.md` — one file per H2 section; H3 and deeper "
+        "headings remain inside the section file as markdown headings",
         "",
         "## Sections",
         "",

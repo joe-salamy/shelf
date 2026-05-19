@@ -15,6 +15,7 @@ from shelf.summarize.orchestrator import (
     _dedup_relationships,
     generate_book_summary,
 )
+from shelf.summarize.prompts import BOOK_ROLLUP_PROMPT
 
 # ---------------------------------------------------------------------------
 # Mock backend
@@ -146,6 +147,11 @@ def test_book_overview_populated():
     backend = MockBackend()
     result = generate_book_summary(tree, backend)
     assert "constitutional law" in result.overview.lower()
+
+
+def test_book_rollup_prompt_requests_one_sentence_overview():
+    assert "single sentence" in BOOK_ROLLUP_PROMPT
+    assert "when an agent should consult it" in BOOK_ROLLUP_PROMPT
 
 
 def test_entities_extracted():

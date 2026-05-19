@@ -88,7 +88,10 @@ def _make_book_summary() -> BookSummary:
         section_summaries=[],
     )
     return BookSummary(
-        overview="This textbook covers constitutional law fundamentals.",
+        overview=(
+            "This textbook covers constitutional law fundamentals. "
+            "This second sentence should not appear in the agent guide."
+        ),
         chapter_summaries=[cs1, cs2],
         all_entities=[
             Entity(
@@ -264,10 +267,21 @@ def test_chapter_agents_md_contains_section_summaries(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "01-chapter-one" / "AGENTS.md").read_text()
+    content = (out / "01-chapter-one" / "AGENTS.md").read_text(encoding="utf-8")
     assert "Section One Point One" in content
     assert "important concepts" in content
     assert "Point A" in content
+
+
+def test_chapter_agents_md_explains_chapter_files(tmp_path):
+    tree = _make_tree()
+    out = tmp_path / "out"
+    write_shelf(tree, out, book_summary=_make_book_summary())
+    content = (out / "01-chapter-one" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "## File guide" in content
+    assert "`CONCEPTS.md`" in content
+    assert "`00-introduction.md`" in content
+    assert "`NN-section-title.md`" in content
 
 
 def test_chapter_concepts_md_created(tmp_path):
@@ -332,17 +346,42 @@ def test_root_agents_md_contains_overview(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "AGENTS.md").read_text()
+    content = (out / "AGENTS.md").read_text(encoding="utf-8")
     assert "constitutional law" in content.lower()
+    assert "This second sentence should not appear" not in content
 
 
 def test_root_agents_md_contains_chapter_summaries(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"
     write_shelf(tree, out, book_summary=_make_book_summary())
-    content = (out / "AGENTS.md").read_text()
+    content = (out / "AGENTS.md").read_text(encoding="utf-8")
     assert "Chapter One" in content
     assert "comprehensive overview" in content
+
+
+def test_root_agents_md_explains_root_and_chapter_files(tmp_path):
+    tree = _make_tree()
+    out = tmp_path / "out"
+    write_shelf(tree, out, book_summary=_make_book_summary())
+    content = (out / "AGENTS.md").read_text(encoding="utf-8")
+    assert "### Textbook root" in content
+    assert "### Chapter directories" in content
+    assert "`INDEX.md`" in content
+    assert "`ENTITIES.md`" in content
+    assert "`GRAPH.md`" in content
+    assert "`CONCEPTS.md`" in content
+    assert "`NN-section-title.md`" in content
+
+
+def test_root_agents_md_explains_summary_files_without_summaries(tmp_path):
+    tree = _make_tree()
+    out = tmp_path / "out"
+    write_shelf(tree, out)
+    content = (out / "AGENTS.md").read_text(encoding="utf-8")
+    assert "`ENTITIES.md` — generated when summarization is enabled" in content
+    assert "`GRAPH.md` — generated when summarization is enabled" in content
+    assert "`CONCEPTS.md` — generated when summarization is enabled" in content
 
 
 def test_index_md_contains_descriptions_with_summary(tmp_path):
