@@ -53,6 +53,8 @@ def test_shelf_help():
     assert "--depth" in result.output
     assert "--index-filename" in result.output
     assert "--max-section-chars" in result.output
+    assert "--fallback" in result.output
+    assert "--fallback-max-chars" in result.output
 
 
 def test_shelf_runs_end_to_end(tmp_path):
@@ -180,3 +182,65 @@ def test_shelf_index_filename_flag(tmp_path):
 
     assert result.exit_code == 0
     assert captured_args["index_filename"] == "NAV.md"
+
+
+def test_shelf_headerless_input_uses_synthetic_sections(tmp_path):
+    pdf = tmp_path / "headerless.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+    captured_args = {}
+
+    def capture_write(tree, output_dir, book_summary=None, index_filename="AGENTS.md"):
+        captured_args["tree"] = tree
+
+    runner = CliRunner()
+    with (
+        patch(
+            "shelf.cli.convert",
+            return_value="First paragraph.\n\nSecond paragraph.",
+        ),
+        patch("shelf.cli.write_shelf", side_effect=capture_write),
+    ):
+        result = runner.invoke(main, [str(pdf), "--output", str(tmp_path / "out")])
+
+    assert result.exit_code == 0, result.output
+    tree = captured_args["tree"]
+    assert tree.chapter_count() == 1
+    assert tree.section_count() == 1
+    assert tree.sections[0].children[0].title == "Part 001"
+
+
+def test_shelf_fallback_none_fails_for_headerless_input(tmp_path):
+    pdf = tmp_path / "headerless.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    runner = CliRunner()
+    with patch("shelf.cli.convert", return_value="No headings here."):
+        result = runner.invoke(main, [str(pdf), "--fallback", "none"])
+
+    assert result.exit_code != 0
+    assert "No markdown headers" in result.output
+
+
+def test_shelf_passes_fallback_max_chars(tmp_path):
+    pdf = tmp_path / "headerless.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    runner = CliRunner()
+    with (
+        patch("shelf.cli.convert", return_value="No headings here."),
+        patch("shelf.cli.split_markdown", return_value=_make_fake_tree()) as mock_split,
+        patch("shelf.cli.write_shelf"),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                str(pdf),
+                "--fallback-max-chars",
+                "12000",
+                "--output",
+                str(tmp_path / "out"),
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert mock_split.call_args.kwargs["fallback_max_chars"] == 12000

@@ -10,6 +10,8 @@ def shelf(
     output_dir: str | Path | None = None,
     depth: int | None = 3,
     summarize: bool = False,
+    fallback: str = "auto",
+    fallback_max_chars: int = 24000,
 ) -> Path:
     """High-level API: convert a textbook file to a markdown directory tree."""
 
@@ -25,7 +27,13 @@ def shelf(
         output_dir = Path(output_dir)
 
     markdown = convert(input_path)
-    tree = split_markdown(markdown, depth=depth, source_path=input_path)
+    tree = split_markdown(
+        markdown,
+        depth=depth,
+        source_path=input_path,
+        fallback=fallback,  # type: ignore[arg-type]
+        fallback_max_chars=fallback_max_chars,
+    )
 
     book_summary: BookSummary | None = None
     if summarize:

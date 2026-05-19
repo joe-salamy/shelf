@@ -145,6 +145,30 @@ def test_section_files_created(tmp_path):
     assert (ch1_dir / "02-section-one-point-two.md").exists()
 
 
+def test_synthetic_sections_written_as_normal_section_files(tmp_path):
+    ch = Section(
+        title="Headerless Book",
+        level=1,
+        content="Shelf did not detect source headings.",
+        children=[
+            Section(title="Part 001", level=2, content="First chunk."),
+            Section(title="Part 002", level=2, content="Second chunk."),
+        ],
+    )
+    tree = BookTree(title="Headerless Book", sections=[ch])
+    out = tmp_path / "out"
+
+    write_shelf(tree, out)
+
+    ch_dir = out / "01-headerless-book"
+    assert (ch_dir / "01-part-001.md").exists()
+    assert (ch_dir / "02-part-002.md").exists()
+    assert "Part 001" in (out / "INDEX.md").read_text()
+    agents = (out / "AGENTS.md").read_text()
+    assert "2** sections" in agents
+    assert "sections are synthetic" in agents
+
+
 def test_section_file_contains_h3(tmp_path):
     tree = _make_tree()
     out = tmp_path / "out"

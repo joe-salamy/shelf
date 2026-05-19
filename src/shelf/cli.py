@@ -52,6 +52,20 @@ from shelf.output import write_shelf
     help="Max characters per LLM call before splitting sections",
 )
 @click.option(
+    "--fallback",
+    type=click.Choice(["auto", "none"]),
+    default="auto",
+    show_default=True,
+    help="Behavior when no markdown headers are detected",
+)
+@click.option(
+    "--fallback-max-chars",
+    default=24000,
+    type=int,
+    show_default=True,
+    help="Target max characters per synthetic section when fallback is auto",
+)
+@click.option(
     "--log",
     "enable_log",
     is_flag=True,
@@ -86,6 +100,8 @@ def main(
     summarize: bool,
     index_filename: str,
     max_section_chars: int,
+    fallback: str,
+    fallback_max_chars: int,
     enable_log: bool,
     test: bool,
     offset: int,
@@ -107,7 +123,16 @@ def main(
         raise click.ClickException(str(e))
 
     click.echo("Splitting into sections...")
-    tree = split_markdown(markdown, depth=depth, source_path=input_path)
+    try:
+        tree = split_markdown(
+            markdown,
+            depth=depth,
+            source_path=input_path,
+            fallback=fallback,  # type: ignore[arg-type]
+            fallback_max_chars=fallback_max_chars,
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e))
 
     if test:
         summarize = True

@@ -1,5 +1,7 @@
 """Tests for shelf.split — the most critical layer."""
 
+import pytest
+
 from shelf.split import split_markdown
 
 # --- Basic structure ---
@@ -96,13 +98,39 @@ def test_no_headers():
     md = "Just some plain text.\nNo headers at all.\n"
     tree = split_markdown(md)
     assert len(tree.sections) == 1
-    assert tree.sections[0].title == "Front Matter"
-    assert "plain text" in tree.sections[0].content
+    assert tree.sections[0].title == "Untitled"
+    assert "synthetic parts" in tree.sections[0].content
+    assert len(tree.sections[0].children) == 1
+    assert tree.sections[0].children[0].title == "Part 001"
+    assert "plain text" in tree.sections[0].children[0].content
 
 
 def test_empty_string():
     tree = split_markdown("")
     assert len(tree.sections) == 0
+
+
+def test_no_headers_split_into_synthetic_parts():
+    md = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
+    tree = split_markdown(md, fallback_max_chars=35)
+    chapter = tree.sections[0]
+
+    assert chapter.title == "Untitled"
+    assert [section.title for section in chapter.children] == ["Part 001", "Part 002"]
+    assert chapter.children[0].content == "First paragraph.\n\nSecond paragraph."
+    assert chapter.children[1].content == "Third paragraph."
+
+
+def test_no_headers_hard_splits_oversized_paragraph():
+    tree = split_markdown("abcdefghij", fallback_max_chars=4)
+    sections = tree.sections[0].children
+
+    assert [section.content for section in sections] == ["abcd", "efgh", "ij"]
+
+
+def test_no_headers_fallback_none_raises():
+    with pytest.raises(ValueError, match="No markdown headers"):
+        split_markdown("Just text.", fallback="none")
 
 
 def test_skipped_levels():
