@@ -187,7 +187,7 @@ def main(
 
     click.echo(f"Converting {input_path.name}...")
     try:
-        markdown = convert(input_path)
+        markdown = convert(input_path, on_progress=lambda msg: click.echo(f"  {msg}"))
     except ValueError as e:
         raise click.ClickException(str(e))
 

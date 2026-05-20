@@ -1,9 +1,9 @@
 """Convert PDF/EPUB files to markdown. Dispatches by file extension."""
 
-from pathlib import Path
 from importlib.metadata import entry_points
+from pathlib import Path
 
-from shelf.convert.base import ConvertBackend
+from shelf.convert.base import ConvertBackend, ProgressCallback
 
 
 def _load_backends() -> dict[str, type[ConvertBackend]]:
@@ -14,11 +14,12 @@ def _load_backends() -> dict[str, type[ConvertBackend]]:
     return backends
 
 
-def convert(path: Path | str) -> str:
+def convert(path: Path | str, on_progress: ProgressCallback | None = None) -> str:
     """Convert a PDF or EPUB file to markdown text.
 
     Args:
         path: Path to the input file.
+        on_progress: Optional callback for long-running conversion updates.
 
     Returns:
         Markdown string.
@@ -32,9 +33,15 @@ def convert(path: Path | str) -> str:
     backends = _load_backends()
     if ext not in backends:
         supported = ", ".join(f".{k}" for k in sorted(backends))
-        raise ValueError(
-            f"Unsupported file type '.{ext}'. Supported: {supported or 'none registered'}"
-        )
+        supported = supported or "none registered"
+        raise ValueError(f"Unsupported file type '.{ext}'. Supported: {supported}")
 
     backend = backends[ext]()
-    return backend.convert(path)
+    markdown = backend.convert(path, on_progress=on_progress)
+    if not markdown.strip():
+        raise ValueError(
+            "Conversion produced no extractable text. This PDF may be scanned, "
+            "image-only, encrypted, or otherwise unsupported by the current "
+            "text extractor."
+        )
+    return markdown
