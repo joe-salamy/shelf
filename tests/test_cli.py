@@ -7,6 +7,8 @@ from click.testing import CliRunner
 
 from shelf.cli import main
 from shelf.models import BookTree, Section
+from shelf.summarize.base import LLMResult
+from shelf.summarize.models import BookSummary
 
 FAKE_MARKDOWN = """\
 # Constitutional Law
@@ -258,6 +260,57 @@ def test_shelf_summarize_flag(tmp_path):
         )
 
     assert result.exit_code == 0, result.output
+
+
+def test_shelf_log_requires_summarization(tmp_path):
+    pdf = tmp_path / "test.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    runner = CliRunner()
+    result = runner.invoke(main, [str(pdf), "--log"])
+
+    assert result.exit_code != 0
+    assert "--log requires --summarize or --test" in result.output
+
+
+def test_shelf_log_writes_jsonl_file(tmp_path):
+    fake_tree = _make_fake_tree()
+    fake_summary = BookSummary(overview="Test overview.", chapter_summaries=[])
+    inner_backend = MagicMock()
+    inner_backend.summarize.return_value = LLMResult(
+        text='{"overview": "Logged."}',
+        metadata={"provider": "test"},
+    )
+
+    def capture_summary(tree, backend, **kwargs):
+        backend.summarize("input", "prompt")
+        return fake_summary
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pdf = Path("Test Book.pdf")
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        with (
+            patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+            patch("shelf.cli.split_markdown", return_value=fake_tree),
+            patch("shelf.cli.write_shelf"),
+            patch("shelf.summarize.get_backend", return_value=inner_backend),
+            patch(
+                "shelf.summarize.generate_book_summary",
+                side_effect=capture_summary,
+            ),
+        ):
+            result = runner.invoke(
+                main,
+                [str(pdf), "--output", "out", "--summarize", "--log", "--yes"],
+            )
+
+        assert result.exit_code == 0, result.output
+        log_files = list(Path("logs/test-book").glob("*.jsonl"))
+        assert len(log_files) == 1
+        assert log_files[0].read_text(encoding="utf-8").strip()
+        assert "Logging LLM calls to logs" in result.output
 
 
 def test_shelf_index_filename_flag(tmp_path):

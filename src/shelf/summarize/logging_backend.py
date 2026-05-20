@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,10 +18,15 @@ class LoggingBackend:
         self._inner = inner
         self._log_file = log_file
         self._log_file.parent.mkdir(parents=True, exist_ok=True)
+        self._log_file.touch(exist_ok=True)
         self._call_index = 0
+        self._lock = threading.Lock()
 
     def summarize(self, text: str, prompt: str) -> LLMResult:
-        self._call_index += 1
+        with self._lock:
+            self._call_index += 1
+            call_index = self._call_index
+
         start = time.monotonic()
         error_info = None
         result: LLMResult | None = None
@@ -33,7 +39,7 @@ class LoggingBackend:
         finally:
             elapsed = time.monotonic() - start
             entry = {
-                "call_index": self._call_index,
+                "call_index": call_index,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "elapsed_seconds": round(elapsed, 2),
                 "prompt_system": prompt,
@@ -43,5 +49,6 @@ class LoggingBackend:
                 "response_metadata": result.metadata if result else None,
                 "error": error_info,
             }
-            with self._log_file.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            with self._lock:
+                with self._log_file.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")

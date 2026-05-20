@@ -176,6 +176,15 @@ def main(
         output if output is not None else Path.cwd() / "shelf" / input_path.stem
     )
 
+    if test:
+        summarize = True
+        msg = "Test mode: limiting to 5 section summaries"
+        if offset:
+            msg += f" (skipping first {offset} sections)"
+        click.echo(msg)
+    elif enable_log and not summarize:
+        raise click.UsageError("--log requires --summarize or --test")
+
     click.echo(f"Converting {input_path.name}...")
     try:
         markdown = convert(input_path)
@@ -193,13 +202,6 @@ def main(
         )
     except ValueError as e:
         raise click.ClickException(str(e))
-
-    if test:
-        summarize = True
-        msg = "Test mode: limiting to 5 section summaries"
-        if offset:
-            msg += f" (skipping first {offset} sections)"
-        click.echo(msg)
 
     book_summary = None
     if summarize:
