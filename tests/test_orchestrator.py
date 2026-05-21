@@ -13,9 +13,10 @@ from shelf.summarize.models import (
 from shelf.summarize.orchestrator import (
     _dedup_entities,
     _dedup_relationships,
+    _parse_section_response,
     generate_book_summary,
 )
-from shelf.summarize.prompts import BOOK_ROLLUP_PROMPT
+from shelf.summarize.prompts import BOOK_ROLLUP_PROMPT, SECTION_PROMPT
 from shelf.summarize.taxonomy import (
     VALID_KINDS,
     VALID_RELATIONS,
@@ -160,6 +161,12 @@ def test_book_rollup_prompt_requests_one_sentence_overview():
     assert "when an agent should consult it" in BOOK_ROLLUP_PROMPT
 
 
+def test_section_prompt_discourages_invented_taxonomy_labels():
+    assert "Use ONLY the listed entity kinds and relationship labels" in SECTION_PROMPT
+    assert "Do not invent narrower labels" in SECTION_PROMPT
+    assert "return an empty array for that key" in SECTION_PROMPT
+
+
 def test_entities_extracted():
     tree = _make_tree()
     backend = MockBackend()
@@ -192,8 +199,61 @@ def test_taxonomy_supports_non_law_textbooks():
 def test_taxonomy_normalizes_common_llm_variants():
     assert normalize_entity_kind("Equation") == "equation"
     assert normalize_entity_kind("data set") == "data_set"
+    assert normalize_entity_kind("organization") == "system"
+    assert normalize_entity_kind("company") == "system"
+    assert normalize_entity_kind("entity") == "concept"
+    assert normalize_entity_kind("metaphor") == "concept"
+    assert normalize_entity_kind("word") == "term"
+    assert normalize_entity_kind("tool") == "method"
+    assert normalize_entity_kind("punctuation") == "term"
     assert normalize_relation("calculated_from") == "CALCULATED-FROM"
     assert normalize_relation("cites") == "CITED-IN"
+    assert normalize_relation("writes") == "RELATED-TO"
+    assert normalize_relation("wrote") == "RELATED-TO"
+    assert normalize_relation("authored") == "RELATED-TO"
+    assert normalize_relation("argued-in") == "RELATED-TO"
+    assert normalize_relation("employed-by") == "RELATED-TO"
+    assert normalize_relation("creates") == "PRODUCES"
+    assert normalize_relation("subject-of") == "RELATED-TO"
+    assert normalize_relation("emphasizes") == "DESCRIBES"
+    assert normalize_relation("party-to") == "RELATED-TO"
+    assert normalize_relation("critiques") == "CONTRASTS-WITH"
+    assert normalize_relation("undermines") == "INHIBITS"
+
+
+def test_parse_section_response_aggregates_unexpected_taxonomy_warnings(caplog):
+    raw = json.dumps(
+        {
+            "summary": "Summary.",
+            "key_points": [],
+            "entities": [
+                {"name": "A", "kind": "unknown kind", "definition": "A."},
+                {"name": "B", "kind": "unknown kind", "definition": "B."},
+                {"name": "C", "kind": "other kind", "definition": "C."},
+            ],
+            "relationships": [
+                {"source": "A", "relation": "ODD-LINK", "target": "B"},
+                {"source": "B", "relation": "ODD-LINK", "target": "C"},
+                {"source": "C", "relation": "STRANGE-LINK", "target": "A"},
+            ],
+            "prerequisites": [],
+            "leads_to": [],
+        }
+    )
+
+    result = _parse_section_response(raw, "Section", "Chapter")
+
+    assert len(result.entities) == 3
+    assert len(result.relationships) == 3
+    warning_messages = [record.message for record in caplog.records]
+    kind_warnings = [m for m in warning_messages if "unexpected entity kinds" in m]
+    relation_warnings = [m for m in warning_messages if "unexpected relations" in m]
+    assert kind_warnings == [
+        "Section 'Section': unexpected entity kinds: other kind (1), unknown kind (2)"
+    ]
+    assert relation_warnings == [
+        "Section 'Section': unexpected relations: ODD-LINK (2), STRANGE-LINK (1)"
+    ]
 
 
 def test_llm_call_count():

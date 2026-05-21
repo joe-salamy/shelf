@@ -22,6 +22,12 @@ SECTION_PROMPT = (
     "already know.\n"
     '6. "leads_to": An array of concept/term names this section prepares the '
     "reader for.\n\n"
+    "Use ONLY the listed entity kinds and relationship labels. "
+    "Do not invent narrower labels such as WRITES, AUTHORED, EMPLOYED-BY, "
+    "CREATES, or ARGUES-IN. When unsure, use broad labels such as "
+    "RELATED-TO, USES, DESCRIBES, CITED-IN, or APPLIES-TO. "
+    "If a field has no useful items, return an empty array for that key; "
+    "do not omit any of the six keys.\n\n"
     "Return ONLY valid JSON. No markdown fencing, no commentary."
 )
 

@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import threading
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
 
@@ -255,6 +256,7 @@ def _parse_section_response(
 
     raw_entities = data.get("entities", [])
     entities = []
+    unexpected_kinds: Counter[str] = Counter()
     for e in raw_entities:
         if not isinstance(e, dict) or not e.get("name"):
             logger.warning(
@@ -264,12 +266,7 @@ def _parse_section_response(
         raw_kind = e.get("kind", "concept")
         kind = normalize_entity_kind(raw_kind)
         if kind not in VALID_KINDS:
-            logger.warning(
-                "Section '%s': unexpected entity kind '%s' for '%s'",
-                section_title,
-                raw_kind,
-                e.get("name"),
-            )
+            unexpected_kinds[str(raw_kind)] += 1
         entities.append(
             Entity(
                 name=e.get("name", ""),
@@ -277,9 +274,16 @@ def _parse_section_response(
                 definition=e.get("definition", ""),
             )
         )
+    if unexpected_kinds:
+        logger.warning(
+            "Section '%s': unexpected entity kinds: %s",
+            section_title,
+            _format_counter(unexpected_kinds),
+        )
 
     raw_rels = data.get("relationships", [])
     relationships = []
+    unexpected_relations: Counter[str] = Counter()
     for r in raw_rels:
         if not isinstance(r, dict) or not r.get("source") or not r.get("target"):
             logger.warning(
@@ -289,19 +293,19 @@ def _parse_section_response(
         raw_relation = r.get("relation", "")
         relation = normalize_relation(raw_relation)
         if relation not in VALID_RELATIONS:
-            logger.warning(
-                "Section '%s': unexpected relation '%s' (%s -> %s)",
-                section_title,
-                raw_relation,
-                r.get("source"),
-                r.get("target"),
-            )
+            unexpected_relations[str(raw_relation)] += 1
         relationships.append(
             Relationship(
                 source=r.get("source", ""),
                 relation=relation,
                 target=r.get("target", ""),
             )
+        )
+    if unexpected_relations:
+        logger.warning(
+            "Section '%s': unexpected relations: %s",
+            section_title,
+            _format_counter(unexpected_relations),
         )
 
     return SectionSummary(
@@ -322,6 +326,10 @@ def _degraded_section(section_title: str, chapter_title: str) -> SectionSummary:
         chapter_title=chapter_title,
         summary="[Summarization failed]",
     )
+
+
+def _format_counter(counter: Counter[str]) -> str:
+    return ", ".join(f"{name} ({count})" for name, count in sorted(counter.items()))
 
 
 def _merge_section_summaries(
