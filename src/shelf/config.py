@@ -8,7 +8,7 @@ SHELF_LLM_BASE_URL: str = os.environ.get(
     "SHELF_LLM_BASE_URL", "https://openrouter.ai/api/v1"
 )
 SHELF_LLM_MODEL: str = os.environ.get(
-    "SHELF_LLM_MODEL", "openai/gpt-oss-safeguard-20b:nitro"
+    "SHELF_LLM_MODEL", "deepseek/deepseek-v4-flash"
 )
 
 # Ollama
