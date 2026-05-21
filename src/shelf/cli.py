@@ -6,18 +6,18 @@ import contextlib
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import TextIO
 
+import click
 from dotenv import load_dotenv
+
+from shelf.convert import convert
+from shelf.output import write_shelf
+from shelf.split import split_markdown
 
 load_dotenv()
 logging.basicConfig(level=logging.WARNING)
-
-import click
-from pathlib import Path
-from shelf.convert import convert
-from shelf.split import split_markdown
-from shelf.output import write_shelf
 
 
 class _TeeStream:
@@ -166,7 +166,10 @@ def _append_root_agents_textbook_section(
     "-d",
     default=None,
     type=int,
-    help="Maximum heading depth to split into separate files (default: all heading levels found in the document)",
+    help=(
+        "Maximum heading depth to split into separate files "
+        "(default: all heading levels found in the document)"
+    ),
 )
 @click.option(
     "--summarize",
@@ -221,7 +224,10 @@ def _append_root_agents_textbook_section(
     default=0,
     type=int,
     show_default=True,
-    help="Skip the first N sections before summarizing (useful with --test to skip intro material)",
+    help=(
+        "Skip the first N sections before summarizing "
+        "(useful with --test to skip intro material)"
+    ),
 )
 @click.option(
     "--yes",
@@ -367,7 +373,8 @@ def main(
             except ContextWindowExceededError as e:
                 raise click.ClickException(
                     f"Context window exceeded: {e}\n"
-                    "Try reducing --max-section-chars or using a model with a larger context window."
+                    "Try reducing --max-section-chars or using a model with a "
+                    "larger context window."
                 )
             except click.Abort:
                 raise
@@ -390,11 +397,13 @@ def main(
         if test:
             summarized = min(5, section_count)
             click.echo(
-                f"Done! Summarized {summarized} of {section_count} sections (test mode) across {chapter_count} chapters -> {rel_out}/"
+                f"Done! Summarized {summarized} of {section_count} sections "
+                f"(test mode) across {chapter_count} chapters -> {rel_out}/"
             )
         else:
             click.echo(
-                f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
+                f"Done! Wrote {section_count} sections across "
+                f"{chapter_count} chapters -> {rel_out}/"
             )
         click.echo(f"Generated {rel_out}/{index_filename}")
 
@@ -418,7 +427,10 @@ def main(
         elif pointer_status == "present":
             click.echo(f"Textbook pointer already exists in {Path.cwd() / 'AGENTS.md'}")
         else:
+            section = _format_root_textbook_section(
+                tree, rel_out, index_filename, chapter_count, section_count
+            )
             click.echo(
                 f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
-                f"{_format_root_textbook_section(tree, rel_out, index_filename, chapter_count, section_count)}"
+                f"{section}"
             )
