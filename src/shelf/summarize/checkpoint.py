@@ -30,6 +30,7 @@ class SummaryCheckpointStore:
         max_chars: int,
         section_limit: int | None,
         section_offset: int,
+        backend_options: dict[str, Any],
     ) -> None:
         self._cache_dir = cache_dir
         self._cache_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +43,7 @@ class SummaryCheckpointStore:
             "max_chars": max_chars,
             "section_limit": section_limit,
             "section_offset": section_offset,
+            "backend_options": backend_options,
         }
 
     def section_key(

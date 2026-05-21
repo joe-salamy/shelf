@@ -8,7 +8,7 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from shelf.config import SHELF_PARALLEL_WORKERS
 from shelf.models import BookTree, Section
@@ -38,6 +38,18 @@ from shelf.summarize.taxonomy import (
 logger = logging.getLogger(__name__)
 
 
+def _backend_checkpoint_options(backend: LLMBackend) -> dict[str, Any]:
+    """Return non-secret backend settings that affect summary output."""
+    options: dict[str, Any] = {
+        "class": f"{backend.__class__.__module__}.{backend.__class__.__qualname__}",
+    }
+    for attr in ("base_url", "model"):
+        value = getattr(backend, attr, None)
+        if value is not None:
+            options[attr] = value
+    return options
+
+
 def generate_book_summary(
     tree: BookTree,
     backend: LLMBackend,
@@ -61,6 +73,7 @@ def generate_book_summary(
             max_chars=max_chars,
             section_limit=section_limit,
             section_offset=section_offset,
+            backend_options=_backend_checkpoint_options(backend),
         )
         if checkpoint_dir is not None
         else None
