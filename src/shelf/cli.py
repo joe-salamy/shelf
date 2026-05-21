@@ -1,18 +1,95 @@
 """Click CLI for shelf."""
 
-import logging
-from datetime import datetime
+from __future__ import annotations
 
+import contextlib
+import logging
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import TextIO
+
+import click
 from dotenv import load_dotenv
+
+from shelf.convert import convert
+from shelf.output import write_shelf
+from shelf.split import split_markdown
 
 load_dotenv()
 logging.basicConfig(level=logging.WARNING)
 
-import click
-from pathlib import Path
-from shelf.convert import convert
-from shelf.split import split_markdown
-from shelf.output import write_shelf
+
+class _TeeStream:
+    """Write text to the original stream and an additional log file."""
+
+    def __init__(self, primary: TextIO, secondary: TextIO):
+        self._primary = primary
+        self._secondary = secondary
+
+    def write(self, text: str) -> int:
+        self._primary.write(text)
+        self._secondary.write(text)
+        return len(text)
+
+    def flush(self) -> None:
+        self._primary.flush()
+        self._secondary.flush()
+
+    def isatty(self) -> bool:
+        return self._primary.isatty()
+
+    @property
+    def encoding(self) -> str | None:
+        return self._primary.encoding
+
+    @property
+    def errors(self) -> str | None:
+        return self._primary.errors
+
+    def __getattr__(self, name: str):
+        return getattr(self._primary, name)
+
+
+@contextlib.contextmanager
+def _tee_console_output(log_file: Path | None):
+    """Mirror stdout and stderr to log_file while preserving normal console output."""
+    if log_file is None:
+        yield
+        return
+
+    try:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        f = log_file.open("a", encoding="utf-8")
+    except OSError as e:
+        raise click.ClickException(f"Unable to open console log file: {e}") from e
+
+    with f:
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        tee_stdout = _TeeStream(original_stdout, f)
+        tee_stderr = _TeeStream(original_stderr, f)
+        retargeted_handlers = []
+
+        sys.stdout = tee_stdout  # type: ignore[assignment]
+        sys.stderr = tee_stderr  # type: ignore[assignment]
+        for handler in logging.getLogger().handlers:
+            if isinstance(handler, logging.StreamHandler):
+                if handler.stream is original_stdout:
+                    retargeted_handlers.append((handler, handler.stream))
+                    handler.setStream(tee_stdout)
+                elif handler.stream is original_stderr:
+                    retargeted_handlers.append((handler, handler.stream))
+                    handler.setStream(tee_stderr)
+        try:
+            yield
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            for handler, stream in retargeted_handlers:
+                handler.setStream(stream)
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
 
 
 def _format_root_textbook_section(
@@ -89,7 +166,10 @@ def _append_root_agents_textbook_section(
     "-d",
     default=None,
     type=int,
-    help="Maximum heading depth to split into separate files (default: all heading levels found in the document)",
+    help=(
+        "Maximum heading depth to split into separate files "
+        "(default: all heading levels found in the document)"
+    ),
 )
 @click.option(
     "--summarize",
@@ -144,7 +224,10 @@ def _append_root_agents_textbook_section(
     default=0,
     type=int,
     show_default=True,
-    help="Skip the first N sections before summarizing (useful with --test to skip intro material)",
+    help=(
+        "Skip the first N sections before summarizing "
+        "(useful with --test to skip intro material)"
+    ),
 )
 @click.option(
     "--yes",
@@ -178,156 +261,176 @@ def main(
 
     if test:
         summarize = True
-        msg = "Test mode: limiting to 5 section summaries"
-        if offset:
-            msg += f" (skipping first {offset} sections)"
-        click.echo(msg)
     elif enable_log and not summarize:
         raise click.UsageError("--log requires --summarize or --test")
 
-    click.echo(f"Converting {input_path.name}...")
-    try:
-        markdown = convert(input_path, on_progress=lambda msg: click.echo(f"  {msg}"))
-    except ValueError as e:
-        raise click.ClickException(str(e))
+    llm_log_file = None
+    console_log_file = None
+    if enable_log:
+        from shelf.slugify import slugify
 
-    click.echo("Splitting into sections...")
-    try:
-        tree = split_markdown(
-            markdown,
-            depth=depth,
-            source_path=input_path,
-            fallback=fallback,  # type: ignore[arg-type]
-            fallback_max_chars=fallback_max_chars,
-        )
-    except ValueError as e:
-        raise click.ClickException(str(e))
+        book_slug = slugify(input_path.stem)
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        log_dir = Path.cwd() / "logs" / book_slug
+        llm_log_file = log_dir / f"{timestamp}.jsonl"
+        console_log_file = log_dir / f"{timestamp}.txt"
 
-    book_summary = None
-    if summarize:
-        click.echo("Generating summaries and entity indexes...")
+    with _tee_console_output(console_log_file):
+        if test:
+            msg = "Test mode: limiting to 5 section summaries"
+            if offset:
+                msg += f" (skipping first {offset} sections)"
+            click.echo(msg)
+
+        click.echo(f"Converting {input_path.name}...")
         try:
-            from shelf.summarize import (
-                ContextWindowExceededError,
-                generate_book_summary,
-                get_backend,
+            markdown = convert(
+                input_path, on_progress=lambda msg: click.echo(f"  {msg}")
             )
-            from shelf.summarize.logging_backend import LoggingBackend
-            from shelf.slugify import slugify
+        except ValueError as e:
+            raise click.ClickException(str(e))
 
-            backend = get_backend()
-
-            # Cost estimate & approval
-            from shelf.summarize.estimate import estimate_cost
-
-            section_lim = 5 if test else None
-            est = estimate_cost(
-                tree,
-                max_chars=max_section_chars,
-                section_limit=section_lim,
-                section_offset=offset,
+        click.echo("Splitting into sections...")
+        try:
+            tree = split_markdown(
+                markdown,
+                depth=depth,
+                source_path=input_path,
+                fallback=fallback,  # type: ignore[arg-type]
+                fallback_max_chars=fallback_max_chars,
             )
+        except ValueError as e:
+            raise click.ClickException(str(e))
 
-            click.echo("\nEstimated LLM usage:")
-            click.echo(
-                f"  Sections:  ~{est.phase1_input_tokens:,} input / "
-                f"~{est.phase1_output_tokens:,} output tokens "
-                f"({est.phase1_llm_calls} calls)"
-            )
-            click.echo(
-                f"  Chapters:  ~{est.phase2_input_tokens:,} input / "
-                f"~{est.phase2_output_tokens:,} output tokens "
-                f"({est.phase2_llm_calls} calls)"
-            )
-            click.echo(
-                f"  Book:      ~{est.phase3_input_tokens:,} input / "
-                f"~{est.phase3_output_tokens:,} output tokens "
-                f"({est.phase3_llm_calls} calls)"
-            )
-            click.echo(
-                f"  Total:     ~{est.total_input_tokens:,} input / "
-                f"~{est.total_output_tokens:,} output tokens"
-            )
-            click.echo(f"  Est. cost: ${est.total_cost_usd:.4f}\n")
-
-            if not yes:
-                click.confirm("Proceed?", default=True, abort=True)
-
-            # Wrap backend with JSONL logger if --log is enabled
-            if enable_log:
-                book_slug = slugify(input_path.stem)
-                log_file = (
-                    Path.cwd()
-                    / "logs"
-                    / book_slug
-                    / f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}.jsonl"
+        book_summary = None
+        if summarize:
+            click.echo("Generating summaries and entity indexes...")
+            try:
+                from shelf.summarize import (
+                    ContextWindowExceededError,
+                    generate_book_summary,
+                    get_backend,
                 )
-                backend = LoggingBackend(backend, log_file)
-                click.echo(f"  Logging LLM calls to {log_file.relative_to(Path.cwd())}")
+                from shelf.summarize.logging_backend import LoggingBackend
 
-            book_summary = generate_book_summary(
+                backend = get_backend()
+
+                # Cost estimate & approval
+                from shelf.summarize.estimate import estimate_cost
+
+                section_lim = 5 if test else None
+                est = estimate_cost(
+                    tree,
+                    max_chars=max_section_chars,
+                    section_limit=section_lim,
+                    section_offset=offset,
+                )
+
+                click.echo("\nEstimated LLM usage:")
+                click.echo(
+                    f"  Sections:  ~{est.phase1_input_tokens:,} input / "
+                    f"~{est.phase1_output_tokens:,} output tokens "
+                    f"({est.phase1_llm_calls} calls)"
+                )
+                click.echo(
+                    f"  Chapters:  ~{est.phase2_input_tokens:,} input / "
+                    f"~{est.phase2_output_tokens:,} output tokens "
+                    f"({est.phase2_llm_calls} calls)"
+                )
+                click.echo(
+                    f"  Book:      ~{est.phase3_input_tokens:,} input / "
+                    f"~{est.phase3_output_tokens:,} output tokens "
+                    f"({est.phase3_llm_calls} calls)"
+                )
+                click.echo(
+                    f"  Total:     ~{est.total_input_tokens:,} input / "
+                    f"~{est.total_output_tokens:,} output tokens"
+                )
+                click.echo(f"  Est. cost: ${est.total_cost_usd:.4f}\n")
+
+                if not yes:
+                    click.confirm("Proceed?", default=True, abort=True)
+
+                # Wrap backend with JSONL logger if --log is enabled
+                if llm_log_file is not None:
+                    backend = LoggingBackend(backend, llm_log_file)
+                    click.echo(
+                        f"  Logging LLM calls to {llm_log_file.relative_to(Path.cwd())}"
+                    )
+                    click.echo(
+                        "  Logging console output to "
+                        f"{console_log_file.relative_to(Path.cwd())}"
+                    )
+
+                book_summary = generate_book_summary(
+                    tree,
+                    backend,
+                    max_chars=max_section_chars,
+                    on_progress=lambda msg: click.echo(f"  {msg}"),
+                    section_limit=5 if test else None,
+                    section_offset=offset,
+                )
+            except ContextWindowExceededError as e:
+                raise click.ClickException(
+                    f"Context window exceeded: {e}\n"
+                    "Try reducing --max-section-chars or using a model with a "
+                    "larger context window."
+                )
+            except click.Abort:
+                raise
+            except click.ClickException:
+                raise
+            except Exception as e:
+                raise click.ClickException(f"Summarization failed: {e}")
+
+        write_shelf(
+            tree, output_dir, book_summary=book_summary, index_filename=index_filename
+        )
+
+        chapter_count = tree.chapter_count()
+        section_count = tree.section_count()
+        try:
+            rel_out = output_dir.relative_to(Path.cwd())
+        except ValueError:
+            rel_out = output_dir
+
+        if test:
+            summarized = min(5, section_count)
+            click.echo(
+                f"Done! Summarized {summarized} of {section_count} sections "
+                f"(test mode) across {chapter_count} chapters -> {rel_out}/"
+            )
+        else:
+            click.echo(
+                f"Done! Wrote {section_count} sections across "
+                f"{chapter_count} chapters -> {rel_out}/"
+            )
+        click.echo(f"Generated {rel_out}/{index_filename}")
+
+        if book_summary:
+            click.echo(f"Generated {rel_out}/ENTITIES.md and {rel_out}/GRAPH.md")
+
+        if output_dir.exists():
+            pointer_status = _append_root_agents_textbook_section(
+                output_dir,
+                rel_out,
                 tree,
-                backend,
-                max_chars=max_section_chars,
-                on_progress=lambda msg: click.echo(f"  {msg}"),
-                section_limit=5 if test else None,
-                section_offset=offset,
+                index_filename,
+                chapter_count,
+                section_count,
             )
-        except ContextWindowExceededError as e:
-            raise click.ClickException(
-                f"Context window exceeded: {e}\n"
-                "Try reducing --max-section-chars or using a model with a larger context window."
+        else:
+            pointer_status = "skipped"
+
+        if pointer_status == "appended":
+            click.echo(f"Added textbook pointer to {Path.cwd() / 'AGENTS.md'}")
+        elif pointer_status == "present":
+            click.echo(f"Textbook pointer already exists in {Path.cwd() / 'AGENTS.md'}")
+        else:
+            section = _format_root_textbook_section(
+                tree, rel_out, index_filename, chapter_count, section_count
             )
-        except click.Abort:
-            raise
-        except click.ClickException:
-            raise
-        except Exception as e:
-            raise click.ClickException(f"Summarization failed: {e}")
-
-    write_shelf(
-        tree, output_dir, book_summary=book_summary, index_filename=index_filename
-    )
-
-    chapter_count = tree.chapter_count()
-    section_count = tree.section_count()
-    try:
-        rel_out = output_dir.relative_to(Path.cwd())
-    except ValueError:
-        rel_out = output_dir
-
-    if test:
-        summarized = min(5, section_count)
-        click.echo(
-            f"Done! Summarized {summarized} of {section_count} sections (test mode) across {chapter_count} chapters -> {rel_out}/"
-        )
-    else:
-        click.echo(
-            f"Done! Wrote {section_count} sections across {chapter_count} chapters -> {rel_out}/"
-        )
-    click.echo(f"Generated {rel_out}/{index_filename}")
-
-    if book_summary:
-        click.echo(f"Generated {rel_out}/ENTITIES.md and {rel_out}/GRAPH.md")
-
-    if output_dir.exists():
-        pointer_status = _append_root_agents_textbook_section(
-            output_dir,
-            rel_out,
-            tree,
-            index_filename,
-            chapter_count,
-            section_count,
-        )
-    else:
-        pointer_status = "skipped"
-
-    if pointer_status == "appended":
-        click.echo(f"Added textbook pointer to {Path.cwd() / 'AGENTS.md'}")
-    elif pointer_status == "present":
-        click.echo(f"Textbook pointer already exists in {Path.cwd() / 'AGENTS.md'}")
-    else:
-        click.echo(
-            f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
-            f"{_format_root_textbook_section(tree, rel_out, index_filename, chapter_count, section_count)}"
-        )
+            click.echo(
+                f"\nAdd this to your root AGENTS.md to make this book discoverable:\n"
+                f"{section}"
+            )

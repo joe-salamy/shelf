@@ -1,5 +1,6 @@
 """Integration tests for the shelf CLI using Click's CliRunner."""
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -273,7 +274,7 @@ def test_shelf_log_requires_summarization(tmp_path):
     assert "--log requires --summarize or --test" in result.output
 
 
-def test_shelf_log_writes_jsonl_file(tmp_path):
+def test_shelf_log_writes_jsonl_and_console_txt_files(tmp_path):
     fake_tree = _make_fake_tree()
     fake_summary = BookSummary(overview="Test overview.", chapter_summaries=[])
     inner_backend = MagicMock()
@@ -310,7 +311,61 @@ def test_shelf_log_writes_jsonl_file(tmp_path):
         log_files = list(Path("logs/test-book").glob("*.jsonl"))
         assert len(log_files) == 1
         assert log_files[0].read_text(encoding="utf-8").strip()
+        console_log_files = list(Path("logs/test-book").glob("*.txt"))
+        assert len(console_log_files) == 1
+        console_log = console_log_files[0].read_text(encoding="utf-8")
+        assert "Converting Test Book.pdf..." in console_log
+        assert "Splitting into sections..." in console_log
+        assert "Estimated LLM usage:" in console_log
+        assert "Logging LLM calls to logs" in console_log
+        assert "Logging console output to logs" in console_log
+        assert "Done!" in console_log
+        assert "Generated out/AGENTS.md" in console_log
         assert "Logging LLM calls to logs" in result.output
+        assert "Logging console output to logs" in result.output
+
+
+def test_shelf_log_console_txt_captures_stdout_and_stderr(tmp_path):
+    fake_tree = _make_fake_tree()
+    fake_summary = BookSummary(overview="Test overview.", chapter_summaries=[])
+    inner_backend = MagicMock()
+    inner_backend.summarize.return_value = LLMResult(
+        text='{"overview": "Logged."}',
+        metadata={"provider": "test"},
+    )
+
+    def capture_summary(tree, backend, **kwargs):
+        print("third-party stdout")
+        print("third-party stderr", file=sys.stderr)
+        backend.summarize("input", "prompt")
+        return fake_summary
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pdf = Path("Test Book.pdf")
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        with (
+            patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+            patch("shelf.cli.split_markdown", return_value=fake_tree),
+            patch("shelf.cli.write_shelf"),
+            patch("shelf.summarize.get_backend", return_value=inner_backend),
+            patch(
+                "shelf.summarize.generate_book_summary",
+                side_effect=capture_summary,
+            ),
+        ):
+            result = runner.invoke(
+                main,
+                [str(pdf), "--output", "out", "--summarize", "--log", "--yes"],
+            )
+
+        assert result.exit_code == 0, result.output
+        console_log_files = list(Path("logs/test-book").glob("*.txt"))
+        assert len(console_log_files) == 1
+        console_log = console_log_files[0].read_text(encoding="utf-8")
+        assert "third-party stdout" in console_log
+        assert "third-party stderr" in console_log
 
 
 def test_shelf_index_filename_flag(tmp_path):
