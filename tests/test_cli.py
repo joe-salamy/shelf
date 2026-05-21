@@ -78,6 +78,85 @@ def test_shelf_runs_end_to_end(tmp_path):
     mock_write.assert_called_once()
 
 
+def test_shelf_processes_multiple_inputs_in_series(tmp_path):
+    pdf1 = tmp_path / "first.pdf"
+    pdf2 = tmp_path / "second.pdf"
+    pdf1.write_bytes(b"%PDF-1.4 fake")
+    pdf2.write_bytes(b"%PDF-1.4 fake")
+
+    fake_tree = _make_fake_tree()
+    converted = []
+    output_dirs = []
+
+    def capture_convert(path, **kwargs):
+        converted.append(path.name)
+        return FAKE_MARKDOWN
+
+    def capture_write(tree, output_dir, book_summary=None, index_filename="AGENTS.md"):
+        output_dirs.append(output_dir)
+
+    runner = CliRunner()
+    with (
+        patch("shelf.cli.convert", side_effect=capture_convert),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf", side_effect=capture_write),
+    ):
+        result = runner.invoke(main, [str(pdf1), str(pdf2)])
+
+    assert result.exit_code == 0, result.output
+    assert converted == ["first.pdf", "second.pdf"]
+    assert [path.name for path in output_dirs] == ["first", "second"]
+    assert "Textbook 1/2: first.pdf" in result.output
+    assert "Textbook 2/2: second.pdf" in result.output
+
+
+def test_shelf_rejects_output_with_multiple_inputs(tmp_path):
+    pdf1 = tmp_path / "first.pdf"
+    pdf2 = tmp_path / "second.pdf"
+    pdf1.write_bytes(b"%PDF-1.4 fake")
+    pdf2.write_bytes(b"%PDF-1.4 fake")
+
+    runner = CliRunner()
+    with patch("shelf.cli.convert") as mock_convert:
+        result = runner.invoke(
+            main, [str(pdf1), str(pdf2), "--output", str(tmp_path / "out")]
+        )
+
+    assert result.exit_code != 0
+    assert "--output can only be used with one input" in result.output
+    mock_convert.assert_not_called()
+
+
+def test_shelf_stops_batch_on_first_failure(tmp_path):
+    pdf1 = tmp_path / "first.pdf"
+    pdf2 = tmp_path / "second.pdf"
+    pdf1.write_bytes(b"%PDF-1.4 fake")
+    pdf2.write_bytes(b"%PDF-1.4 fake")
+
+    fake_tree = _make_fake_tree()
+    writes = []
+
+    def capture_convert(path, **kwargs):
+        if path.name == "second.pdf":
+            raise ValueError("Unsupported file type")
+        return FAKE_MARKDOWN
+
+    def capture_write(tree, output_dir, book_summary=None, index_filename="AGENTS.md"):
+        writes.append(output_dir.name)
+
+    runner = CliRunner()
+    with (
+        patch("shelf.cli.convert", side_effect=capture_convert),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf", side_effect=capture_write),
+    ):
+        result = runner.invoke(main, [str(pdf1), str(pdf2)])
+
+    assert result.exit_code != 0
+    assert writes == ["first"]
+    assert "Unsupported file type" in result.output
+
+
 def test_shelf_prints_success_message(tmp_path):
     pdf = tmp_path / "test.pdf"
     pdf.write_bytes(b"%PDF-1.4 fake")
@@ -260,6 +339,58 @@ def test_shelf_summarize_flag(tmp_path):
         )
 
     assert result.exit_code == 0, result.output
+
+
+def test_shelf_resume_summaries_passes_checkpoint_dir(tmp_path):
+    pdf = tmp_path / "test.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    fake_tree = _make_fake_tree()
+    fake_summary = BookSummary(overview="Test overview.", chapter_summaries=[])
+    captured_kwargs = {}
+
+    def capture_summary(tree, backend, **kwargs):
+        captured_kwargs.update(kwargs)
+        return fake_summary
+
+    runner = CliRunner()
+    with (
+        patch("shelf.cli.convert", return_value=FAKE_MARKDOWN),
+        patch("shelf.cli.split_markdown", return_value=fake_tree),
+        patch("shelf.cli.write_shelf"),
+        patch("shelf.summarize.get_backend", return_value=MagicMock()),
+        patch(
+            "shelf.summarize.generate_book_summary",
+            side_effect=capture_summary,
+        ),
+    ):
+        result = runner.invoke(
+            main,
+            [
+                str(pdf),
+                "--output",
+                str(tmp_path / "out"),
+                "--summarize",
+                "--resume-summaries",
+                "--yes",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert captured_kwargs["checkpoint_dir"] == (
+        tmp_path / "out" / ".shelf-summary-cache"
+    )
+
+
+def test_shelf_resume_summaries_requires_summarization(tmp_path):
+    pdf = tmp_path / "test.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    runner = CliRunner()
+    result = runner.invoke(main, [str(pdf), "--resume-summaries"])
+
+    assert result.exit_code != 0
+    assert "--resume-summaries requires --summarize or --test" in result.output
 
 
 def test_shelf_log_requires_summarization(tmp_path):
