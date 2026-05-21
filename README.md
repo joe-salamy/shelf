@@ -100,6 +100,9 @@ shelf textbook.pdf
 # Convert an EPUB
 shelf textbook.epub
 
+# Queue multiple textbooks; each runs in series
+shelf textbook.pdf casebook.epub
+
 # Custom output directory and heading depth
 shelf textbook.pdf --output my-notes --depth 2
 
@@ -114,6 +117,7 @@ shelf textbook.pdf --summarize
 | `--output`, `-o`    | `shelf/<filename>` | Output directory                     |
 | `--depth`           | `3`                | Heading levels to split (1–6)        |
 | `--summarize`, `-s` | off                | Prepend AI summaries to each section |
+| `--resume-summaries` | off               | Reuse saved LLM summary checkpoints  |
 
 ---
 
@@ -130,6 +134,9 @@ ollama pull llama3
 # Shelf will use it automatically
 shelf textbook.pdf --summarize
 ```
+
+Use `--resume-summaries` with `--summarize` to save completed LLM summaries under
+the output directory and reuse matching checkpoints after an interrupted run.
 
 **OpenAI-compatible API:**
 

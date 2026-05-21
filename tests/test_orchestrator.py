@@ -32,8 +32,10 @@ from shelf.summarize.taxonomy import (
 class MockBackend:
     """Returns well-formed JSON for any summarize call."""
 
-    def __init__(self):
+    def __init__(self, model=None):
         self.call_count = 0
+        if model is not None:
+            self.model = model
 
     def summarize(self, text: str, prompt: str) -> LLMResult:
         self.call_count += 1
@@ -262,6 +264,66 @@ def test_llm_call_count():
     backend = MockBackend()
     generate_book_summary(tree, backend)
     assert backend.call_count == 6
+
+
+def test_generate_book_summary_reuses_checkpoints(tmp_path):
+    tree = _make_tree()
+    cache_dir = tmp_path / "summary-cache"
+
+    first_backend = MockBackend()
+    first = generate_book_summary(tree, first_backend, checkpoint_dir=cache_dir)
+    assert first_backend.call_count == 6
+
+    second_backend = MockBackend()
+    second = generate_book_summary(tree, second_backend, checkpoint_dir=cache_dir)
+
+    assert second_backend.call_count == 0
+    assert second == first
+
+
+def test_generate_book_summary_invalidates_checkpoints_when_options_change(tmp_path):
+    tree = _make_tree()
+    cache_dir = tmp_path / "summary-cache"
+
+    first_backend = MockBackend()
+    generate_book_summary(
+        tree, first_backend, max_chars=24000, checkpoint_dir=cache_dir
+    )
+
+    second_backend = MockBackend()
+    generate_book_summary(
+        tree, second_backend, max_chars=12000, checkpoint_dir=cache_dir
+    )
+
+    assert second_backend.call_count == 6
+
+
+def test_generate_book_summary_invalidates_checkpoints_when_backend_changes(tmp_path):
+    tree = _make_tree()
+    cache_dir = tmp_path / "summary-cache"
+
+    first_backend = MockBackend(model="model-a")
+    generate_book_summary(tree, first_backend, checkpoint_dir=cache_dir)
+
+    second_backend = MockBackend(model="model-b")
+    generate_book_summary(tree, second_backend, checkpoint_dir=cache_dir)
+
+    assert second_backend.call_count == 6
+
+
+def test_generate_book_summary_ignores_malformed_cached_section(tmp_path):
+    tree = _make_tree()
+    cache_dir = tmp_path / "summary-cache"
+
+    first_backend = MockBackend()
+    generate_book_summary(tree, first_backend, checkpoint_dir=cache_dir)
+    first_cache_file = next(cache_dir.glob("*.json"))
+    first_cache_file.write_text("{not json", encoding="utf-8")
+
+    second_backend = MockBackend()
+    generate_book_summary(tree, second_backend, checkpoint_dir=cache_dir)
+
+    assert second_backend.call_count >= 1
 
 
 def test_on_progress_called():

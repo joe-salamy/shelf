@@ -8,11 +8,13 @@ import re
 import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable
+from pathlib import Path
+from typing import Any, Callable
 
 from shelf.config import SHELF_PARALLEL_WORKERS
 from shelf.models import BookTree, Section
 from shelf.summarize.base import LLMBackend
+from shelf.summarize.checkpoint import SummaryCheckpointStore
 from shelf.summarize.exceptions import ContextWindowExceededError
 from shelf.summarize.models import (
     BookSummary,
@@ -37,6 +39,18 @@ from shelf.summarize.taxonomy import (
 logger = logging.getLogger(__name__)
 
 
+def _backend_checkpoint_options(backend: LLMBackend) -> dict[str, Any]:
+    """Return non-secret backend settings that affect summary output."""
+    options: dict[str, Any] = {
+        "class": f"{backend.__class__.__module__}.{backend.__class__.__qualname__}",
+    }
+    for attr in ("base_url", "model"):
+        value = getattr(backend, attr, None)
+        if value is not None:
+            options[attr] = value
+    return options
+
+
 def generate_book_summary(
     tree: BookTree,
     backend: LLMBackend,
@@ -44,6 +58,7 @@ def generate_book_summary(
     on_progress: Callable[[str], None] | None = None,
     section_limit: int | None = None,
     section_offset: int = 0,
+    checkpoint_dir: Path | None = None,
 ) -> BookSummary:
     """Run the full bottom-up summarization pipeline."""
 
@@ -52,6 +67,18 @@ def generate_book_summary(
             on_progress(msg)
 
     chapters = [s for s in tree.sections if s.title != "Front Matter"]
+    checkpoints = (
+        SummaryCheckpointStore(
+            checkpoint_dir,
+            tree,
+            max_chars=max_chars,
+            section_limit=section_limit,
+            section_offset=section_offset,
+            backend_options=_backend_checkpoint_options(backend),
+        )
+        if checkpoint_dir is not None
+        else None
+    )
 
     # Collect all H2 sections across chapters for progress counting
     total_sections = sum(len(ch.children) for ch in chapters)
@@ -76,19 +103,46 @@ def generate_book_summary(
         ch.title: [None] * len(ch.children) for ch in chapters
     }
 
+    section_work: list[tuple[str, int, Section, str | None]] = []
+    for ch_title, sec_idx, section in tasks:
+        key = None
+        if checkpoints is not None:
+            content = _render_section_text(section)
+            key = checkpoints.section_key(
+                ch_title,
+                sec_idx,
+                section.title,
+                content,
+                SECTION_PROMPT,
+            )
+            cached = checkpoints.load_section(key)
+            if cached is not None:
+                chapter_section_summaries[ch_title][sec_idx] = cached
+                with progress_lock:
+                    progress_counter += 1
+                    _log(
+                        f"Section {progress_counter}/{total_sections}: "
+                        f"{section.title} (cached)"
+                    )
+                continue
+        section_work.append((ch_title, sec_idx, section, key))
+
     with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
         future_to_task = {
             pool.submit(_summarize_section, section, ch_title, backend, max_chars): (
                 ch_title,
                 sec_idx,
                 section.title,
+                key,
             )
-            for ch_title, sec_idx, section in tasks
+            for ch_title, sec_idx, section, key in section_work
         }
         for section_future in as_completed(future_to_task):
-            ch_title, sec_idx, sec_title = future_to_task[section_future]
+            ch_title, sec_idx, sec_title, key = future_to_task[section_future]
             ss = section_future.result()
             chapter_section_summaries[ch_title][sec_idx] = ss
+            if checkpoints is not None and key is not None:
+                checkpoints.save_section(key, ss)
             with progress_lock:
                 progress_counter += 1
                 _log(f"Section {progress_counter}/{total_sections}: {sec_title}")
@@ -116,28 +170,57 @@ def generate_book_summary(
 
     chapter_summaries: list[ChapterSummary | None] = [None] * len(rollup_chapters)
 
+    chapter_work: list[tuple[int, Section, str | None]] = []
+    for idx, ch in enumerate(rollup_chapters):
+        key = None
+        if checkpoints is not None:
+            input_text = _render_chapter_rollup_input(
+                ch.title, filled_summaries[ch.title]
+            )
+            key = checkpoints.chapter_key(ch.title, input_text, CHAPTER_ROLLUP_PROMPT)
+            cached = checkpoints.load_chapter(key)
+            if cached is not None:
+                chapter_summaries[idx] = cached
+                _log(f"Chapter {idx + 1}/{len(rollup_chapters)}: {ch.title} (cached)")
+                continue
+        chapter_work.append((idx, ch, key))
+
     with ThreadPoolExecutor(max_workers=SHELF_PARALLEL_WORKERS) as pool:
-        future_to_idx = {
+        future_to_task = {
             pool.submit(
                 _rollup_chapter,
                 ch.title,
                 filled_summaries[ch.title],
                 backend,
-            ): idx
-            for idx, ch in enumerate(rollup_chapters)
+            ): (idx, key)
+            for idx, ch, key in chapter_work
         }
-        for chapter_future in as_completed(future_to_idx):
-            idx = future_to_idx[chapter_future]
+        for chapter_future in as_completed(future_to_task):
+            idx, key = future_to_task[chapter_future]
             title = rollup_chapters[idx].title
             _log(f"Chapter {idx + 1}/{len(rollup_chapters)}: {title}")
-            chapter_summaries[idx] = chapter_future.result()
+            chapter_summary = chapter_future.result()
+            chapter_summaries[idx] = chapter_summary
+            if checkpoints is not None and key is not None:
+                checkpoints.save_chapter(key, chapter_summary)
 
     # All slots filled — narrow the type
     completed_chapters = [cs for cs in chapter_summaries if cs is not None]
 
     # --- Phase 3: book rollup ---
-    _log("Generating book overview...")
-    overview = _rollup_book(completed_chapters, backend)
+    book_input_text = _render_book_rollup_input(completed_chapters)
+    overview = None
+    if checkpoints is not None:
+        book_key = checkpoints.book_key(book_input_text, BOOK_ROLLUP_PROMPT)
+        overview = checkpoints.load_book_overview(book_key)
+        if overview is not None:
+            _log("Generating book overview... (cached)")
+
+    if overview is None:
+        _log("Generating book overview...")
+        overview = _rollup_book(completed_chapters, backend)
+        if checkpoints is not None:
+            checkpoints.save_book_overview(book_key, overview)
 
     all_entities = _dedup_entities(
         [e for cs in completed_chapters for e in cs.entities]
@@ -375,17 +458,7 @@ def _rollup_chapter(
     backend: LLMBackend,
 ) -> ChapterSummary:
     """Roll up section summaries into a chapter summary."""
-    # Build input text for the LLM
-    lines = [f"Chapter: {chapter_title}\n"]
-    for ss in section_summaries:
-        lines.append(f"## {ss.section_title}")
-        lines.append(ss.summary)
-        if ss.key_points:
-            lines.append("Key points:")
-            for kp in ss.key_points:
-                lines.append(f"- {kp}")
-        lines.append("")
-    input_text = "\n".join(lines)
+    input_text = _render_chapter_rollup_input(chapter_title, section_summaries)
 
     summary = chapter_title  # fallback
     try:
@@ -431,12 +504,7 @@ def _rollup_book(
     backend: LLMBackend,
 ) -> str:
     """Roll up chapter summaries into a book overview."""
-    lines = []
-    for cs in chapter_summaries:
-        lines.append(f"## {cs.chapter_title}")
-        lines.append(cs.summary)
-        lines.append("")
-    input_text = "\n".join(lines)
+    input_text = _render_book_rollup_input(chapter_summaries)
 
     try:
         raw = backend.summarize(input_text, BOOK_ROLLUP_PROMPT).text
@@ -453,6 +521,30 @@ def _rollup_book(
     except Exception as exc:
         logger.warning("Book rollup failed: %s", exc)
         return "[Book overview generation failed]"
+
+
+def _render_book_rollup_input(chapter_summaries: list[ChapterSummary]) -> str:
+    lines = []
+    for cs in chapter_summaries:
+        lines.append(f"## {cs.chapter_title}")
+        lines.append(cs.summary)
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _render_chapter_rollup_input(
+    chapter_title: str, section_summaries: list[SectionSummary]
+) -> str:
+    lines = [f"Chapter: {chapter_title}\n"]
+    for ss in section_summaries:
+        lines.append(f"## {ss.section_title}")
+        lines.append(ss.summary)
+        if ss.key_points:
+            lines.append("Key points:")
+            for kp in ss.key_points:
+                lines.append(f"- {kp}")
+        lines.append("")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

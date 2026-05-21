@@ -153,7 +153,13 @@ def _append_root_agents_textbook_section(
 
 
 @click.command()
-@click.argument("input_path", type=click.Path(exists=True, path_type=Path))
+@click.argument(
+    "input_paths",
+    nargs=-1,
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    metavar="INPUT_PATH...",
+)
 @click.option(
     "--output",
     "-o",
@@ -236,7 +242,60 @@ def _append_root_agents_textbook_section(
     default=False,
     help="Skip cost-estimate confirmation prompt",
 )
+@click.option(
+    "--resume-summaries",
+    is_flag=True,
+    default=False,
+    help="Reuse saved LLM summary checkpoints from the output directory",
+)
 def main(
+    input_paths: tuple[Path, ...],
+    output: Path | None,
+    depth: int,
+    summarize: bool,
+    index_filename: str,
+    max_section_chars: int,
+    fallback: str,
+    fallback_max_chars: int,
+    enable_log: bool,
+    test: bool,
+    offset: int,
+    yes: bool,
+    resume_summaries: bool,
+) -> None:
+    """Convert PDF or EPUB textbooks into nested markdown directories.
+
+    INPUT_PATH is the path to a PDF or EPUB file to convert. Multiple inputs are
+    processed in series, as if shelf were run once for each input.
+    """
+
+    if len(input_paths) > 1 and output is not None:
+        raise click.UsageError("--output can only be used with one input")
+    if resume_summaries and not summarize and not test:
+        raise click.UsageError("--resume-summaries requires --summarize or --test")
+
+    for idx, input_path in enumerate(input_paths, start=1):
+        if len(input_paths) > 1:
+            click.echo(f"Textbook {idx}/{len(input_paths)}: {input_path.name}")
+        _process_textbook(
+            input_path=input_path,
+            output=output,
+            depth=depth,
+            summarize=summarize,
+            index_filename=index_filename,
+            max_section_chars=max_section_chars,
+            fallback=fallback,
+            fallback_max_chars=fallback_max_chars,
+            enable_log=enable_log,
+            test=test,
+            offset=offset,
+            yes=yes,
+            resume_summaries=resume_summaries,
+        )
+
+
+def _process_textbook(
+    *,
     input_path: Path,
     output: Path | None,
     depth: int,
@@ -249,12 +308,8 @@ def main(
     test: bool,
     offset: int,
     yes: bool,
+    resume_summaries: bool,
 ) -> None:
-    """Convert a PDF or EPUB textbook into a nested markdown directory.
-
-    INPUT_PATH is the path to the PDF or EPUB file to convert.
-    """
-
     output_dir = (
         output if output is not None else Path.cwd() / "shelf" / input_path.stem
     )
@@ -369,6 +424,11 @@ def main(
                     on_progress=lambda msg: click.echo(f"  {msg}"),
                     section_limit=5 if test else None,
                     section_offset=offset,
+                    checkpoint_dir=(
+                        output_dir / ".shelf-summary-cache"
+                        if resume_summaries
+                        else None
+                    ),
                 )
             except ContextWindowExceededError as e:
                 raise click.ClickException(
