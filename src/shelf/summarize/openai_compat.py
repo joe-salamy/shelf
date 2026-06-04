@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
-
 from typing import cast
 
-from shelf.config import SHELF_LLM_API_KEY, SHELF_LLM_BASE_URL, SHELF_LLM_MODEL
+from shelf.config import SHELF_LLM_BASE_URL, SHELF_LLM_MODEL
 from shelf.summarize.base import LLMResult
 from shelf.summarize.exceptions import ContextWindowExceededError
 
@@ -19,7 +19,7 @@ INITIAL_BACKOFF = 2.0  # seconds
 
 class OpenAICompatBackend:
     def __init__(self) -> None:
-        self.api_key = SHELF_LLM_API_KEY
+        self.api_key = os.environ.get("SHELF_LLM_API_KEY", "")
         self.base_url = SHELF_LLM_BASE_URL
         self.model = SHELF_LLM_MODEL
 

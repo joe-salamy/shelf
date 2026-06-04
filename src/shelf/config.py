@@ -2,14 +2,16 @@
 
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # LLM (OpenAI-compatible)
 SHELF_LLM_API_KEY: str = os.environ.get("SHELF_LLM_API_KEY", "")
 SHELF_LLM_BASE_URL: str = os.environ.get(
     "SHELF_LLM_BASE_URL", "https://openrouter.ai/api/v1"
 )
-SHELF_LLM_MODEL: str = os.environ.get(
-    "SHELF_LLM_MODEL", "deepseek/deepseek-v4-flash"
-)
+SHELF_LLM_MODEL: str = os.environ.get("SHELF_LLM_MODEL", "deepseek/deepseek-v4-flash")
 
 # Ollama
 SHELF_OLLAMA_URL: str = os.environ.get("SHELF_OLLAMA_URL", "http://localhost:11434")

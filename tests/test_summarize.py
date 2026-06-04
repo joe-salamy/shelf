@@ -8,7 +8,7 @@ from shelf.summarize import get_backend
 
 
 def test_get_backend_uses_api_key_when_set(monkeypatch):
-    monkeypatch.setattr("shelf.summarize.SHELF_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("SHELF_LLM_API_KEY", "test-key")
     with patch("shelf.summarize.openai_compat.OpenAICompatBackend") as mock_cls:
         mock_cls.return_value = MagicMock()
         get_backend()
@@ -16,7 +16,7 @@ def test_get_backend_uses_api_key_when_set(monkeypatch):
 
 
 def test_get_backend_uses_ollama_when_available(monkeypatch):
-    monkeypatch.setattr("shelf.summarize.SHELF_LLM_API_KEY", "")
+    monkeypatch.delenv("SHELF_LLM_API_KEY", raising=False)
     with patch("shelf.summarize.ollama.OllamaBackend") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.is_available.return_value = True
@@ -26,7 +26,7 @@ def test_get_backend_uses_ollama_when_available(monkeypatch):
 
 
 def test_get_backend_raises_when_nothing_available(monkeypatch):
-    monkeypatch.setattr("shelf.summarize.SHELF_LLM_API_KEY", "")
+    monkeypatch.delenv("SHELF_LLM_API_KEY", raising=False)
     with patch("shelf.summarize.ollama.OllamaBackend") as mock_cls:
         mock_instance = MagicMock()
         mock_instance.is_available.return_value = False
