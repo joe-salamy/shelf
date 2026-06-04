@@ -44,6 +44,57 @@ def test_content_assigned_correctly(simple_markdown):
     assert "Content for section 1.1" in sec1.content
 
 
+def test_book_title_h1_wrapping_numbered_h2_chapters_is_promoted():
+    md = (
+        "Preface before title.\n\n"
+        "# Modern Recording Techniques\n\n"
+        "Title-page content.\n\n"
+        "## Copyright\n\n"
+        "Copyright page.\n\n"
+        "## Chapter 1. Introduction\n\n"
+        "Chapter one intro.\n\n"
+        "### The recording studio\n\n"
+        "Studio content.\n\n"
+        "## Chapter 2. Sound and Hearing\n\n"
+        "Chapter two intro.\n"
+    )
+
+    tree = split_markdown(md)
+
+    assert tree.title == "Modern Recording Techniques"
+    assert [section.title for section in tree.sections] == [
+        "Front Matter",
+        "Chapter 1. Introduction",
+        "Chapter 2. Sound and Hearing",
+    ]
+    assert "Preface before title." in tree.sections[0].content
+    assert "Title-page content." in tree.sections[0].content
+    assert "## Copyright" in tree.sections[0].content
+    assert "Copyright page." in tree.sections[0].content
+    assert tree.sections[1].level == 1
+    assert tree.sections[1].children[0].title == "The recording studio"
+    assert tree.sections[1].children[0].level == 2
+
+
+def test_single_h1_with_non_chapter_h2_sections_is_not_promoted():
+    md = (
+        "# Book Title\n\n"
+        "Intro.\n\n"
+        "## Part 1\n\n"
+        "Part content.\n\n"
+        "## Chapter 1. Lone Chapter\n\n"
+        "Chapter content.\n"
+    )
+
+    tree = split_markdown(md)
+
+    assert [section.title for section in tree.sections] == ["Book Title"]
+    assert [section.title for section in tree.sections[0].children] == [
+        "Part 1",
+        "Chapter 1. Lone Chapter",
+    ]
+
+
 # --- Front matter ---
 
 
