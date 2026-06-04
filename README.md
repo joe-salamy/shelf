@@ -112,12 +112,12 @@ shelf textbook.pdf --summarize
 
 ## Options
 
-| Flag                | Default            | Description                          |
-| ------------------- | ------------------ | ------------------------------------ |
-| `--output`, `-o`    | `shelf/<filename>` | Output directory                     |
-| `--depth`           | `3`                | Heading levels to split (1–6)        |
-| `--summarize`, `-s` | off                | Prepend AI summaries to each section |
-| `--resume-summaries` | off               | Reuse saved LLM summary checkpoints  |
+| Flag                 | Default            | Description                          |
+| -------------------- | ------------------ | ------------------------------------ |
+| `--output`, `-o`     | `shelf/<filename>` | Output directory                     |
+| `--depth`            | `3`                | Heading levels to split (1–6)        |
+| `--summarize`, `-s`  | off                | Prepend AI summaries to each section |
+| `--resume-summaries` | off                | Reuse saved LLM summary checkpoints  |
 
 ---
 

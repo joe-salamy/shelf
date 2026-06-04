@@ -25,3 +25,10 @@ Shelf is a CLI tool that converts PDF and EPUB textbooks into nested, grep-frien
 - Keep READMEs concise.
 
 Reference textbooks are in ./shelf\Intro to Statistical Thermodynamics - Molecular Perspective (Elstner, Cui, Gruden)/
+
+## Shelf Textbook: Modern Recording Techniques
+
+- Textbook path: `./shelf/Modern Recording Techniques, Seventh Edition -- DAVID MILES HUBER - ROBERT E. RUNSTEIN -- ( WeLib.org )/`
+- Navigation guide: `./shelf/Modern Recording Techniques, Seventh Edition -- DAVID MILES HUBER - ROBERT E. RUNSTEIN -- ( WeLib.org )/AGENTS.md`
+- Source file: `Modern Recording Techniques, Seventh Edition -- DAVID MILES HUBER - ROBERT E. RUNSTEIN -- ( WeLib.org ).epub`
+- Scope: 2 chapters, 1179 sections
